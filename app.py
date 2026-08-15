@@ -19,7 +19,7 @@ from reportlab.pdfgen import canvas
 
 from PIL import Image, ImageDraw, ImageFont
 
-from tensorflow.keras.models import load_model
+
 
 
 # ============================================================
@@ -107,8 +107,12 @@ def load_lstm_model():
     try:
 
         print("======================================")
+        print("Loading TensorFlow for LSTM...")
+        print("======================================")
+
+        from tensorflow.keras.models import load_model
+
         print("Loading LSTM model...")
-        print("LSTM model path:", MODEL_DIR / "lstm_news_classifier.keras")
 
         lstm_model = load_model(
             MODEL_DIR / "lstm_news_classifier.keras",
@@ -118,19 +122,17 @@ def load_lstm_model():
         print("LSTM model loaded successfully.")
 
         print("Loading LSTM tokenizer...")
-        print("Tokenizer path:", MODEL_DIR / "lstm_tokenizer.pkl")
 
         lstm_tokenizer = joblib.load(
             MODEL_DIR / "lstm_tokenizer.pkl"
         )
 
         print("LSTM tokenizer loaded successfully.")
-        print("LSTM initialization completed.")
 
     except Exception as e:
 
         print("======================================")
-        print("LSTM MODEL LOADING ERROR")
+        print("LSTM MODEL ERROR")
         print("Error type:", type(e).__name__)
         print("Error:", str(e))
         print("======================================")
