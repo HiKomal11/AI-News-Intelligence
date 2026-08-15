@@ -103,8 +103,6 @@ lstm_interpreter = None
 lstm_input_details = None
 lstm_output_details = None
 lstm_tokenizer = None
-
-
 def load_lstm_model():
 
     global lstm_interpreter
@@ -124,7 +122,7 @@ def load_lstm_model():
         print("Loading LSTM TFLite model...")
         print("======================================")
 
-        import tensorflow as tf
+        from ai_edge_litert.interpreter import Interpreter
 
         model_path = (
             MODEL_DIR /
@@ -136,7 +134,7 @@ def load_lstm_model():
             "lstm_tokenizer.pkl"
         )
 
-        lstm_interpreter = tf.lite.Interpreter(
+        lstm_interpreter = Interpreter(
             model_path=str(model_path)
         )
 
@@ -154,8 +152,9 @@ def load_lstm_model():
 
         print("Loading LSTM tokenizer...")
 
-        with open(tokenizer_path, "rb") as file:
-            lstm_tokenizer = pickle.load(file)
+        lstm_tokenizer = joblib.load(
+            tokenizer_path
+        )
 
         print("LSTM tokenizer loaded successfully.")
 
