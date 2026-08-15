@@ -110,19 +110,22 @@ def load_lstm_model():
     global lstm_output_details
     global lstm_tokenizer
 
+    print("LSTM STEP 1: entered load_lstm_model()", flush=True)
+
     if (
         lstm_interpreter is not None
         and lstm_tokenizer is not None
     ):
+        print("LSTM STEP 2: model already loaded", flush=True)
         return
 
     try:
 
-        print("======================================")
-        print("Loading LSTM TFLite model...")
-        print("======================================")
+        print("LSTM STEP 3: importing LiteRT...", flush=True)
 
         from ai_edge_litert.interpreter import Interpreter
+
+        print("LSTM STEP 4: LiteRT imported", flush=True)
 
         model_path = (
             MODEL_DIR /
@@ -134,11 +137,43 @@ def load_lstm_model():
             "lstm_tokenizer.pkl"
         )
 
+        print(
+            f"LSTM STEP 5: model path = {model_path}",
+            flush=True
+        )
+
+        print(
+            f"LSTM STEP 6: model exists = {model_path.exists()}",
+            flush=True
+        )
+
+        print(
+            f"LSTM STEP 7: tokenizer exists = {tokenizer_path.exists()}",
+            flush=True
+        )
+
+        print("LSTM STEP 8: creating Interpreter...", flush=True)
+
         lstm_interpreter = Interpreter(
             model_path=str(model_path)
         )
 
+        print(
+            "LSTM STEP 9: Interpreter created",
+            flush=True
+        )
+
+        print(
+            "LSTM STEP 10: allocating tensors...",
+            flush=True
+        )
+
         lstm_interpreter.allocate_tensors()
+
+        print(
+            "LSTM STEP 11: tensors allocated",
+            flush=True
+        )
 
         lstm_input_details = (
             lstm_interpreter.get_input_details()
@@ -148,31 +183,70 @@ def load_lstm_model():
             lstm_interpreter.get_output_details()
         )
 
-        print("TFLite model loaded successfully.")
+        print(
+            "LSTM STEP 12: input/output details loaded",
+            flush=True
+        )
 
-        print("Loading LSTM tokenizer...")
+        print(
+            "Input:",
+            lstm_input_details,
+            flush=True
+        )
+
+        print(
+            "Output:",
+            lstm_output_details,
+            flush=True
+        )
+
+        print(
+            "LSTM STEP 13: loading tokenizer...",
+            flush=True
+        )
 
         lstm_tokenizer = joblib.load(
             tokenizer_path
         )
 
-        print("LSTM tokenizer loaded successfully.")
+        print(
+            "LSTM STEP 14: tokenizer loaded",
+            flush=True
+        )
 
-        print("Input details:")
-        print(lstm_input_details)
-
-        print("Output details:")
-        print(lstm_output_details)
-
-        print("LSTM initialization completed.")
+        print(
+            "LSTM STEP 15: LSTM initialization completed",
+            flush=True
+        )
 
     except Exception as e:
 
-        print("======================================")
-        print("LSTM TFLITE ERROR")
-        print("Error type:", type(e).__name__)
-        print("Error:", str(e))
-        print("======================================")
+        print(
+            "======================================",
+            flush=True
+        )
+
+        print(
+            "LSTM TFLITE ERROR",
+            flush=True
+        )
+
+        print(
+            "Error type:",
+            type(e).__name__,
+            flush=True
+        )
+
+        print(
+            "Error:",
+            str(e),
+            flush=True
+        )
+
+        print(
+            "======================================",
+            flush=True
+        )
 
         lstm_interpreter = None
         lstm_input_details = None
