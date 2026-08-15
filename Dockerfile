@@ -27,4 +27,4 @@ COPY . .
 
 ENV TESSERACT_CMD=/usr/bin/tesseract
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} app:app"]
+CMD ["sh", "-c", "gunicorn --workers 1 --threads 2 --timeout 120 --bind 0.0.0.0:${PORT:-10000} app:app"]
