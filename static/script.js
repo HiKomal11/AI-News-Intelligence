@@ -303,14 +303,45 @@ async function analyzeText(model) {
         );
 
 
-        const data = await response.json();
+        // Read response as text first
+        const responseText =
+            await response.text();
 
 
+        let data = {};
+
+
+        // Safely parse JSON
+        if (responseText) {
+
+            try {
+
+                data = JSON.parse(
+                    responseText
+                );
+
+            } catch (parseError) {
+
+                console.error(
+                    "Invalid JSON response:",
+                    responseText
+                );
+
+                throw new Error(
+                    `Server returned an invalid response (${response.status}).`
+                );
+
+            }
+
+        }
+
+
+        // Handle HTTP errors
         if (!response.ok) {
 
             throw new Error(
                 data.error ||
-                "Prediction failed."
+                `Prediction failed. Server returned ${response.status}.`
             );
 
         }
@@ -324,8 +355,14 @@ async function analyzeText(model) {
 
     } catch (error) {
 
+        console.error(
+            "Prediction error:",
+            error
+        );
+
         showError(
-            error.message
+            error.message ||
+            "Unable to analyze the news article."
         );
 
     } finally {
@@ -334,7 +371,6 @@ async function analyzeText(model) {
 
     }
 }
-
 
 // ============================================================
 // FILE ANALYSIS

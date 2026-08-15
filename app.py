@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+import traceback
 
 import joblib
 import numpy as np
@@ -100,22 +101,46 @@ def load_lstm_model():
     global lstm_model
     global lstm_tokenizer
 
-    if lstm_model is None:
+    if lstm_model is not None and lstm_tokenizer is not None:
+        return
 
+    try:
+
+        print("======================================")
         print("Loading LSTM model...")
+        print("LSTM model path:", MODEL_DIR / "lstm_news_classifier.keras")
 
         lstm_model = load_model(
-            MODEL_DIR / "lstm_news_classifier.keras"
+            MODEL_DIR / "lstm_news_classifier.keras",
+            compile=False
         )
 
+        print("LSTM model loaded successfully.")
+
         print("Loading LSTM tokenizer...")
+        print("Tokenizer path:", MODEL_DIR / "lstm_tokenizer.pkl")
 
         lstm_tokenizer = joblib.load(
             MODEL_DIR / "lstm_tokenizer.pkl"
         )
 
-        print("LSTM model loaded successfully.")
+        print("LSTM tokenizer loaded successfully.")
+        print("LSTM initialization completed.")
 
+    except Exception as e:
+
+        print("======================================")
+        print("LSTM MODEL LOADING ERROR")
+        print("Error type:", type(e).__name__)
+        print("Error:", str(e))
+        print("======================================")
+
+        lstm_model = None
+        lstm_tokenizer = None
+
+        raise RuntimeError(
+            f"Failed to load LSTM model: {str(e)}"
+        )
 # ============================================================
 # LSTM SETTINGS
 # ============================================================
@@ -767,15 +792,16 @@ def predict():
 
     except Exception as e:
 
-        print(
-            "Prediction error:",
-            e
-        )
+        print("======================================")
+        print("PREDICTION ERROR")
+        print("Error type:", type(e).__name__)
+        print("Error:", str(e))
+        traceback.print_exc()
+        print("======================================")
 
         return jsonify({
             "error": str(e)
         }), 500
-
 # ============================================================
 # FILE UPLOAD
 # ============================================================
