@@ -147,7 +147,7 @@ def load_lstm_model():
 # LSTM SETTINGS
 # ============================================================
 
-LSTM_MAX_SEQUENCE_LENGTH = 300
+LSTM_MAX_SEQUENCE_LENGTH = 200
 
 
 # ============================================================

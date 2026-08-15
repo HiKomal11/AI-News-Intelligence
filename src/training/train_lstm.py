@@ -36,11 +36,11 @@ MODEL_DIR.mkdir(exist_ok=True)
 # SETTINGS
 # ============================================================
 
-MAX_WORDS = 30000
-MAX_SEQUENCE_LENGTH = 300
+MAX_WORDS = 10000
+MAX_SEQUENCE_LENGTH = 200
 
-EMBEDDING_DIM = 128
-LSTM_UNITS = 64
+EMBEDDING_DIM = 64
+LSTM_UNITS = 32
 
 TEST_SIZE = 0.20
 RANDOM_STATE = 42
@@ -142,10 +142,10 @@ print("Testing tensor shape:", X_test_pad.shape)
 # BUILD LSTM MODEL
 # ============================================================
 
-print("\nBuilding LSTM model...")
+print("\nBuilding lightweight LSTM model...")
 
 model = Sequential([
-    
+
     Embedding(
         input_dim=MAX_WORDS,
         output_dim=EMBEDDING_DIM,
@@ -157,16 +157,16 @@ model = Sequential([
     ),
 
     Dropout(
-        0.5
+        0.4
     ),
 
     Dense(
-        32,
+        16,
         activation="relu"
     ),
 
     Dropout(
-        0.3
+        0.2
     ),
 
     Dense(
@@ -174,7 +174,6 @@ model = Sequential([
         activation="sigmoid"
     )
 ])
-
 
 # ============================================================
 # COMPILE
