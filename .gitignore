@@ -1,0 +1,25 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# IDE
+.vscode/
+
+# Uploaded user files
+uploads/*
+!uploads/.gitkeep
+
+# Generated prediction reports
+results/generated/*
+!results/generated/.gitkeep
+
+# Training datasets
+data/*.csv
+
+# OS files
+.DS_Store
+Thumbs.db

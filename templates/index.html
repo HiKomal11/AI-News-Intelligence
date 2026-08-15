@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AI News Intelligence</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<div class="page">
+
+    <!-- NAVBAR -->
+
+    <nav class="navbar">
+
+        <div class="brand">
+            <span class="brand-mark">AN</span>
+
+            <div>
+                <strong>AI News Intelligence</strong>
+                <small>NLP-Based News Analysis System</small>
+            </div>
+        </div>
+
+        <div class="nav-links">
+            <a href="#analyzer">Analyzer</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#models">Models</a>
+            <a href="#about">About</a>
+        </div>
+        <div class="theme-toggle">
+
+            <button
+                id="lightMode"
+                class="theme-button active"
+                onclick="setTheme('light')"
+            >
+                ☀ Light
+            </button>
+
+            <button
+                id="darkMode"
+                class="theme-button"
+                onclick="setTheme('dark')"
+            >
+                ☾ Dark
+            </button>
+
+        </div>
+
+    </nav>
+
+
+    <!-- HERO -->
+
+    <header class="hero">
+
+        <div class="hero-tag">
+            NLP • MACHINE LEARNING • DEEP LEARNING • BIG DATA
+        </div>
+
+        <h1>
+            Analyze News.<br>
+            Understand the Prediction.
+        </h1>
+
+        
+        <a
+            href="#analyzer"
+            class="hero-button"
+        >
+            Start Analysis
+        </a>
+
+    </header>
+
+
+    <!-- ANALYZER -->
+
+    <main>
+
+        <section
+            id="analyzer"
+            class="section"
+        >
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>News Analyzer</h2>
+
+                    <p>
+                        Enter news text or upload an image/PDF.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="analyzer-card">
+
+                <!-- INPUT SWITCH -->
+
+                <div class="input-switch">
+
+                    <button
+                        class="switch-button active"
+                        data-tab="text"
+                        onclick="switchTab('text')"
+                    >
+                        Text Input
+                    </button>
+
+                    <button
+                        class="switch-button"
+                        data-tab="file"
+                        onclick="switchTab('file')"
+                    >
+                        Image / PDF
+                    </button>
+
+                </div>
+
+
+                <!-- TEXT -->
+
+                <div
+                    id="textPanel"
+                    class="panel active"
+                >
+
+                    <label class="field-label">
+                        News Article
+                    </label>
+
+                    <textarea
+                        id="newsText"
+                        placeholder="Paste the news article here..."
+                    ></textarea>
+
+                    <div class="input-hint">
+                        Enter the article text, including its headline if available.
+                    </div>
+
+                </div>
+
+
+                <!-- FILE -->
+
+                <div
+                    id="filePanel"
+                    class="panel"
+                >
+
+                    <label class="field-label">
+                        Upload News
+                    </label>
+
+                    <div
+                        id="dropZone"
+                        class="drop-zone"
+                    >
+
+                        <div class="upload-symbol">
+                            +
+                        </div>
+
+                        <h3>
+                            Drop an image or PDF here
+                        </h3>
+
+                        <p>
+                            or select a file from your computer
+                        </p>
+
+                        <label class="browse-button">
+
+                            Select File
+
+                            <input
+                                type="file"
+                                id="fileInput"
+                                accept=".png,.jpg,.jpeg,.webp,.pdf"
+                                hidden
+                            >
+
+                        </label>
+
+                        <small>
+                            PNG, JPG, JPEG, WEBP and PDF · Maximum 16 MB
+                        </small>
+
+                    </div>
+
+
+                    <div
+                        id="selectedFile"
+                        class="selected-file hidden"
+                    >
+
+                        <div>
+                            <span class="file-icon">PDF</span>
+
+                            <div>
+                                <strong id="selectedFileName"></strong>
+
+                                <small>
+                                    Ready for analysis
+                                </small>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onclick="removeFile()"
+                        >
+                            Remove
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="extractedPreview"
+                        class="extracted-preview hidden"
+                    >
+
+                        <label class="field-label">
+                            Extracted Text
+                        </label>
+
+                        <textarea
+                            id="extractedText"
+                            readonly
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <!-- MODEL -->
+
+                <div class="model-area">
+
+                    <label class="field-label">
+                        Prediction Model
+                    </label>
+
+                    <div class="model-selection">
+
+                        <label class="model-choice">
+
+                            <input
+                                type="radio"
+                                name="model"
+                                value="tfidf"
+                                checked
+                            >
+
+                            <div>
+
+                                <strong>
+                                    TF-IDF + Logistic Regression
+                                </strong>
+
+                                <span>
+                                    Traditional NLP model · 99.10%
+                                </span>
+
+                            </div>
+
+                        </label>
+
+
+                        <label class="model-choice">
+
+                            <input
+                                type="radio"
+                                name="model"
+                                value="lstm"
+                            >
+
+                            <div>
+
+                                <strong>
+                                    LSTM Neural Network
+                                </strong>
+
+                                <span>
+                                    Deep learning model · 93.34%
+                                </span>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ACTION -->
+
+                <div class="action-area">
+
+                    <button
+                        id="analyzeButton"
+                        class="analyze-button"
+                        onclick="analyze()"
+                    >
+                        Analyze News
+                        <span>→</span>
+                    </button>
+
+                    <button
+                        class="clear-button"
+                        onclick="clearAll()"
+                    >
+                        Clear
+                    </button>
+
+                </div>
+
+
+                <!-- LOADING -->
+
+                <div
+                    id="loading"
+                    class="loading hidden"
+                >
+
+                    <div class="loader"></div>
+
+                    <span>
+                        Processing your content...
+                    </span>
+
+                </div>
+
+
+                <!-- ERROR -->
+
+                <div
+                    id="error"
+                    class="error hidden"
+                ></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- RESULT -->
+
+        <section
+            id="resultCard"
+            class="result-section hidden"
+        >
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>Analysis Result</h2>
+
+                    <p>
+                        Prediction generated from the selected model.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="result-card">
+
+                <div
+                    id="resultIcon"
+                    class="result-icon"
+                >
+                </div>
+
+                <div class="result-main">
+
+                    <span class="result-label">
+                        PREDICTION
+                    </span>
+
+                    <h2 id="resultTitle"></h2>
+
+                    <p id="sourceInfo"></p>
+
+                </div>
+
+
+                <div class="confidence-box">
+
+                    <div class="confidence-heading">
+
+                        <span>
+                            Model confidence
+                        </span>
+
+                        <strong id="confidence">
+                            0%
+                        </strong>
+
+                    </div>
+
+                    <div class="confidence-track">
+
+                        <div
+                            id="confidenceBar"
+                            class="confidence-fill"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="statistics">
+
+                    <div>
+                        <span>MODEL</span>
+                        <strong id="resultModel"></strong>
+                    </div>
+
+                    <div>
+                        <span>WORDS</span>
+                        <strong id="resultWords"></strong>
+                    </div>
+
+                    <div>
+                        <span>CHARACTERS</span>
+                        <strong id="resultCharacters"></strong>
+                    </div>
+
+                </div>
+
+
+                <!-- DOWNLOAD -->
+
+                <div
+                    id="downloadSection"
+                    class="download-section hidden"
+                >
+
+                    <div>
+                        <strong>Save the result</strong>
+
+                        <p>
+                            Generate a report for your project or presentation.
+                        </p>
+                    </div>
+
+                    <div class="download-actions">
+
+                        <a
+                            id="downloadPdf"
+                            href="#"
+                            class="download-button"
+                        >
+                            Download PDF
+                        </a>
+
+                        <a
+                            id="downloadPng"
+                            href="#"
+                            class="download-button secondary"
+                        >
+                            Download Image
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- HOW IT WORKS -->
+
+        <section
+            id="how-it-works"
+            class="section"
+        >
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>How It Works</h2>
+
+                    <p>
+                        The system processes the input through several stages.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="pipeline">
+
+                <div class="pipeline-step">
+
+                    
+
+                    <h3>Input</h3>
+
+                    <p>
+                        Text, image or PDF is provided for analysis.
+                    </p>
+
+                </div>
+
+
+                <div class="pipeline-line"></div>
+
+
+                <div class="pipeline-step">
+
+                    
+
+                    <h3>Extraction</h3>
+
+                    <p>
+                        OCR or PDF extraction obtains the article text.
+                    </p>
+
+                </div>
+
+
+                <div class="pipeline-line"></div>
+
+
+                <div class="pipeline-step">
+
+                    
+
+                    <h3>NLP</h3>
+
+                    <p>
+                        Text is cleaned, tokenized and transformed.
+                    </p>
+
+                </div>
+
+
+                <div class="pipeline-line"></div>
+
+
+                <div class="pipeline-step">
+
+                    
+
+                    <h3>Prediction</h3>
+
+                    <p>
+                        The selected model predicts the news class.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- MODELS -->
+
+        <section
+            id="models"
+            class="section"
+        >
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>Model Comparison</h2>
+
+                    <p>
+                        Two different approaches were implemented and evaluated.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="model-grid">
+
+                <article class="model-card">
+
+
+                    <h3>
+                        TF-IDF + Logistic Regression
+                    </h3>
+
+                    <p>
+                        A traditional NLP approach using TF-IDF
+                        features and Logistic Regression classification.
+                    </p>
+
+                    <div class="accuracy">
+                        <strong>99.10%</strong>
+                        <span>Test Accuracy</span>
+                    </div>
+
+                </article>
+
+
+                <article class="model-card">
+
+
+                    <h3>
+                        LSTM Neural Network
+                    </h3>
+
+                    <p>
+                        A deep learning approach using tokenized text,
+                        embeddings and an LSTM sequence model.
+                    </p>
+
+                    <div class="accuracy">
+                        <strong>93.34%</strong>
+                        <span>Test Accuracy</span>
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <!-- BIG DATA -->
+
+        <section class="section">
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>Big Data Component</h2>
+
+                    <p>
+                        PySpark was used to process and analyze the news dataset.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="bigdata-card">
+
+                <div class="bigdata-stat">
+                    <strong>39,105</strong>
+                    <span>Articles Processed</span>
+                </div>
+
+                <div class="bigdata-stat">
+                    <strong>17,908</strong>
+                    <span>Fake Articles</span>
+                </div>
+
+                <div class="bigdata-stat">
+                    <strong>21,197</strong>
+                    <span>Real Articles</span>
+                </div>
+
+                <div class="bigdata-stat">
+                    <strong>7</strong>
+                    <span>Subject Categories</span>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ABOUT -->
+
+        <section
+            id="about"
+            class="section"
+        >
+
+            <div class="section-title">
+
+                
+
+                <div>
+                    <h2>About the Project</h2>
+
+                    <p>
+                        Built as an academic NLP and machine learning project.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="about-card">
+
+                <div>
+
+                    <h3>
+                        Project Objective
+                    </h3>
+
+                    <p>
+                        The purpose of this project is to explore how
+                        Natural Language Processing, machine learning,
+                        deep learning and Big Data techniques can be
+                        combined to analyze news content.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <h3>
+                        Technologies Used
+                    </h3>
+
+                    <div class="technology-list">
+
+                        <span>Python</span>
+                        <span>NLTK</span>
+                        <span>Scikit-learn</span>
+                        <span>TensorFlow</span>
+                        <span>Keras</span>
+                        <span>PySpark</span>
+                        <span>Flask</span>
+                        <span>Tesseract OCR</span>
+                        <span>PyMuPDF</span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- DISCLAIMER -->
+
+        <section class="disclaimer">
+
+            <strong>Note:</strong>
+
+            The result is a machine-learning prediction based on patterns
+            learned from the training dataset. It should not be treated as
+            guaranteed factual verification.
+
+        </section>
+
+    </main>
+
+
+    <footer>
+
+        <strong>
+            AI News Intelligence
+        </strong>
+
+        <span>
+            Designed & Developed by Komal Pandey
+        </span>
+
+    </footer>
+
+</div>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+</body>
+
+</html>

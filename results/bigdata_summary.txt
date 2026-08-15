@@ -1,0 +1,8 @@
+AI NEWS INTELLIGENCE - BIG DATA SUMMARY
+==================================================
+
+Total articles: 39105
+Fake articles: 17908
+Real articles: 21197
+
+Spark Version: 4.2.0
