@@ -81,30 +81,40 @@ vectorizer = joblib.load(
     MODEL_DIR / "tfidf_vectorizer.pkl"
 )
 
-
 print("Loading Logistic Regression model...")
 
 model = joblib.load(
     MODEL_DIR / "logistic_regression.pkl"
 )
 
-
-print("Loading LSTM model...")
-
-lstm_model = load_model(
-    MODEL_DIR / "lstm_news_classifier.keras"
-)
+print("TF-IDF model loaded successfully.")
 
 
-print("Loading LSTM tokenizer...")
-
-lstm_tokenizer = joblib.load(
-    MODEL_DIR / "lstm_tokenizer.pkl"
-)
+# LSTM is loaded only when requested.
+lstm_model = None
+lstm_tokenizer = None
 
 
-print("All models loaded successfully!")
+def load_lstm_model():
 
+    global lstm_model
+    global lstm_tokenizer
+
+    if lstm_model is None:
+
+        print("Loading LSTM model...")
+
+        lstm_model = load_model(
+            MODEL_DIR / "lstm_news_classifier.keras"
+        )
+
+        print("Loading LSTM tokenizer...")
+
+        lstm_tokenizer = joblib.load(
+            MODEL_DIR / "lstm_tokenizer.pkl"
+        )
+
+        print("LSTM model loaded successfully.")
 
 # ============================================================
 # LSTM SETTINGS
@@ -165,6 +175,8 @@ def predict_text(
     # ========================================================
 
     elif selected_model == "lstm":
+
+        load_lstm_model()
 
         sequence = (
             lstm_tokenizer
