@@ -954,23 +954,23 @@ def file_too_large(error):
 
 if __name__ == "__main__":
 
+    import os
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
+
     print("\n======================================")
     print("        AI NEWS INTELLIGENCE")
     print("======================================")
-    print(
-        "Open: http://127.0.0.1:5000"
-    )
+    print(f"Starting server on port {port}")
     print("======================================\n")
 
-    if __name__ == "__main__":
-        print("\n======================================")
-        print("        AI NEWS INTELLIGENCE")
-        print("======================================")
-        print("Starting local development server...")
-        print("======================================\n")
-
-        app.run(
-            host="0.0.0.0",
-            port=5000,
-            debug=True
-        )
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
