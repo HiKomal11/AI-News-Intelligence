@@ -19,7 +19,10 @@ from reportlab.pdfgen import canvas
 
 from PIL import Image, ImageDraw, ImageFont
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9d23a86 (Optimize TensorFlow LSTM memory usage)
 
 
 # ============================================================
@@ -105,7 +108,6 @@ def load_lstm_model():
         return
 
     try:
-
         print("======================================")
         print("Loading TensorFlow for LSTM...")
         print("======================================")
@@ -135,6 +137,7 @@ def load_lstm_model():
         print("LSTM MODEL ERROR")
         print("Error type:", type(e).__name__)
         print("Error:", str(e))
+        traceback.print_exc()
         print("======================================")
 
         lstm_model = None
@@ -142,8 +145,7 @@ def load_lstm_model():
 
         raise RuntimeError(
             f"Failed to load LSTM model: {str(e)}"
-        )
-# ============================================================
+        )# ============================================================
 # LSTM SETTINGS
 # ============================================================
 
