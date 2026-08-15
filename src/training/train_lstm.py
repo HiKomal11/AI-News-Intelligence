@@ -16,6 +16,7 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 
@@ -146,14 +147,19 @@ print("\nBuilding lightweight LSTM model...")
 
 model = Sequential([
 
+    Input(
+        shape=(MAX_SEQUENCE_LENGTH,),
+        dtype="int32"
+    ),
+
     Embedding(
         input_dim=MAX_WORDS,
-        output_dim=EMBEDDING_DIM,
-        input_length=MAX_SEQUENCE_LENGTH
+        output_dim=EMBEDDING_DIM
     ),
 
     LSTM(
-        LSTM_UNITS
+        LSTM_UNITS,
+        unroll=True
     ),
 
     Dropout(

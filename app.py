@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 import traceback
+import pickle
 
 import joblib
 import numpy as np
@@ -94,58 +95,95 @@ model = joblib.load(
 print("TF-IDF model loaded successfully.")
 
 
-# LSTM is loaded only when requested.
-lstm_model = None
+# ============================================================
+# LSTM TFLITE MODEL
+# ============================================================
+
+lstm_interpreter = None
+lstm_input_details = None
+lstm_output_details = None
 lstm_tokenizer = None
 
 
 def load_lstm_model():
 
-    global lstm_model
+    global lstm_interpreter
+    global lstm_input_details
+    global lstm_output_details
     global lstm_tokenizer
 
-    if lstm_model is not None and lstm_tokenizer is not None:
+    if (
+        lstm_interpreter is not None
+        and lstm_tokenizer is not None
+    ):
         return
 
     try:
+
         print("======================================")
-        print("Loading TensorFlow for LSTM...")
+        print("Loading LSTM TFLite model...")
         print("======================================")
 
-        from tensorflow.keras.models import load_model
+        import tensorflow as tf
 
-        print("Loading LSTM model...")
-
-        lstm_model = load_model(
-            MODEL_DIR / "lstm_news_classifier.keras",
-            compile=False
+        model_path = (
+            MODEL_DIR /
+            "lstm_news_classifier.tflite"
         )
 
-        print("LSTM model loaded successfully.")
+        tokenizer_path = (
+            MODEL_DIR /
+            "lstm_tokenizer.pkl"
+        )
+
+        lstm_interpreter = tf.lite.Interpreter(
+            model_path=str(model_path)
+        )
+
+        lstm_interpreter.allocate_tensors()
+
+        lstm_input_details = (
+            lstm_interpreter.get_input_details()
+        )
+
+        lstm_output_details = (
+            lstm_interpreter.get_output_details()
+        )
+
+        print("TFLite model loaded successfully.")
 
         print("Loading LSTM tokenizer...")
 
-        lstm_tokenizer = joblib.load(
-            MODEL_DIR / "lstm_tokenizer.pkl"
-        )
+        with open(tokenizer_path, "rb") as file:
+            lstm_tokenizer = pickle.load(file)
 
         print("LSTM tokenizer loaded successfully.")
+
+        print("Input details:")
+        print(lstm_input_details)
+
+        print("Output details:")
+        print(lstm_output_details)
+
+        print("LSTM initialization completed.")
 
     except Exception as e:
 
         print("======================================")
-        print("LSTM MODEL ERROR")
+        print("LSTM TFLITE ERROR")
         print("Error type:", type(e).__name__)
         print("Error:", str(e))
-        traceback.print_exc()
         print("======================================")
 
-        lstm_model = None
+        lstm_interpreter = None
+        lstm_input_details = None
+        lstm_output_details = None
         lstm_tokenizer = None
 
         raise RuntimeError(
-            f"Failed to load LSTM model: {str(e)}"
-        )# ============================================================
+            f"Failed to load LSTM TFLite model: {str(e)}"
+        )
+# ============================================================
 # LSTM SETTINGS
 # ============================================================
 
@@ -161,18 +199,15 @@ def predict_text(
     selected_model: str
 ) -> dict:
 
-    cleaned_text = clean_text(
-        text
-    )
+    cleaned_text = clean_text(text)
 
     if not cleaned_text:
-
         raise ValueError(
             "No usable text was found after preprocessing."
         )
 
     # ========================================================
-    # TF-IDF
+    # TF-IDF + LOGISTIC REGRESSION
     # ========================================================
 
     if selected_model == "tfidf":
@@ -182,9 +217,7 @@ def predict_text(
         )
 
         prediction = int(
-            model.predict(
-                text_vector
-            )[0]
+            model.predict(text_vector)[0]
         )
 
         probabilities = model.predict_proba(
@@ -200,30 +233,38 @@ def predict_text(
         )
 
     # ========================================================
-    # LSTM
+    # LSTM TFLITE
     # ========================================================
 
     elif selected_model == "lstm":
 
+        # Load TFLite model + tokenizer
         load_lstm_model()
 
-        sequence = (
-            lstm_tokenizer
-            .texts_to_sequences(
-                [cleaned_text]
-            )
+        # ----------------------------------------------------
+        # TEXT → TOKEN SEQUENCE
+        # ----------------------------------------------------
+
+        sequence = lstm_tokenizer.texts_to_sequences(
+            [cleaned_text]
         )
 
         sequence = sequence[0][
             :LSTM_MAX_SEQUENCE_LENGTH
         ]
 
+        # ----------------------------------------------------
+        # PADDING
+        # IMPORTANT: TFLite model expects INT32
+        # ----------------------------------------------------
+        input_dtype = lstm_input_details[0]["dtype"]
+
         padded_sequence = np.zeros(
             (
                 1,
                 LSTM_MAX_SEQUENCE_LENGTH
             ),
-            dtype=np.int32
+            dtype=input_dtype
         )
 
         if sequence:
@@ -233,12 +274,44 @@ def predict_text(
                 :len(sequence)
             ] = sequence
 
-        probability = float(
-            lstm_model.predict(
-                padded_sequence,
-                verbose=0
-            )[0][0]
+        # ----------------------------------------------------
+        # GET TFLITE INPUT / OUTPUT INDEX
+        # ----------------------------------------------------
+
+        input_index = (
+            lstm_input_details[0]["index"]
         )
+
+        output_index = (
+            lstm_output_details[0]["index"]
+        )
+
+        # ----------------------------------------------------
+        # RUN TFLITE MODEL
+        # ----------------------------------------------------
+
+        lstm_interpreter.set_tensor(
+            input_index,
+            padded_sequence
+        )
+
+        lstm_interpreter.invoke()
+
+        # ----------------------------------------------------
+        # GET PROBABILITY
+        # ----------------------------------------------------
+
+        probability = float(
+            lstm_interpreter
+            .get_tensor(output_index)[0][0]
+        )
+
+        # ----------------------------------------------------
+        # CLASSIFICATION
+        #
+        # 0 = Fake
+        # 1 = Real
+        # ----------------------------------------------------
 
         if probability >= 0.5:
 
@@ -257,13 +330,17 @@ def predict_text(
             )
 
         model_name = (
-            "LSTM Neural Network"
+            "LSTM Neural Network (TFLite)"
         )
+
+    # ========================================================
+    # INVALID MODEL
+    # ========================================================
 
     else:
 
         raise ValueError(
-            "Invalid model selected."
+            f"Unknown model selected: {selected_model}"
         )
 
     # ========================================================
@@ -280,23 +357,32 @@ def predict_text(
         label = "REAL"
         result = "Real News"
 
+    # ========================================================
+    # RETURN RESULT
+    # ========================================================
+
     return {
         "prediction": label,
+
         "result": result,
+
         "confidence": round(
             confidence,
             2
         ),
+
         "model": model_name,
+
         "word_count": len(
             text.split()
         ),
+
         "character_count": len(
             text
         ),
+
         "extracted_text": text
     }
-
 
 # ============================================================
 # RESULT PDF
@@ -958,19 +1044,11 @@ def file_too_large(error):
 
 if __name__ == "__main__":
 
-    import os
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            5000
-        )
-    )
-
     print("\n======================================")
     print("        AI NEWS INTELLIGENCE")
     print("======================================")
     print(f"Starting server on port {port}")
+    print("Open: http://127.0.0.1:5000")
     print("======================================\n")
 
     app.run(
