@@ -19,7 +19,9 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 
 from PIL import Image, ImageDraw, ImageFont
-#===========================================================
+
+
+# ============================================================
 # INTERNAL IMPORTS
 # ============================================================
 
@@ -67,8 +69,6 @@ GENERATED_DIR.mkdir(
 # FILE SETTINGS
 # ============================================================
 
-# Maximum uploaded file size: 16 MB
-
 app.config["MAX_CONTENT_LENGTH"] = (
     16 * 1024 * 1024
 )
@@ -77,31 +77,8 @@ app.config["MAX_CONTENT_LENGTH"] = (
 # ============================================================
 # ENVIRONMENT DETECTION
 # ============================================================
-#
-# LOCAL:
-#     LSTM available
-#
-# RENDER:
-#     LSTM disabled
-#
-# Render automatically provides the RENDER environment
-# variable.
-#
-# We also support:
-#
-#     AI_NEWS_ENV=render
-#
-# or:
-#
-#     AI_NEWS_ENABLE_LSTM=0
-#
-# ============================================================
 
 def is_render_environment():
-
-    # --------------------------------------------------------
-    # Render's built-in environment variable
-    # --------------------------------------------------------
 
     render_variable = (
         os.getenv(
@@ -122,10 +99,6 @@ def is_render_environment():
         return True
 
 
-    # --------------------------------------------------------
-    # Optional custom environment variable
-    # --------------------------------------------------------
-
     ai_news_env = (
         os.getenv(
             "AI_NEWS_ENV",
@@ -139,10 +112,6 @@ def is_render_environment():
 
         return True
 
-
-    # --------------------------------------------------------
-    # Otherwise assume local
-    # --------------------------------------------------------
 
     return False
 
@@ -164,22 +133,16 @@ ENVIRONMENT_NAME = (
 # LSTM AVAILABILITY
 # ============================================================
 #
-# Default behavior:
+# Local:
+#     LSTM enabled by default
 #
-# LOCAL  -> LSTM enabled
-# RENDER -> LSTM disabled
+# Render:
+#     LSTM also enabled for lightweight TFLite testing
 #
-# Optional override:
+# To disable:
 #
-# AI_NEWS_ENABLE_LSTM=1
-# AI_NEWS_ENABLE_LSTM=0
+#     AI_NEWS_ENABLE_LSTM=0
 #
-# IMPORTANT:
-#
-# Render is always blocked unless you intentionally change
-# this code.
-#
-# This prevents accidental LSTM activation on Render.
 # ============================================================
 
 lstm_override = (
@@ -191,18 +154,6 @@ lstm_override = (
     .lower()
 )
 
-
-# ============================================================
-# LSTM AVAILABILITY
-# ============================================================
-#
-# TESTING CONFIGURATION:
-#
-# Local  -> TF-IDF + LSTM
-# Render -> TF-IDF + LSTM
-#
-# AI_NEWS_ENABLE_LSTM can explicitly disable LSTM.
-# ============================================================
 
 if lstm_override in {
     "0",
@@ -216,6 +167,7 @@ if lstm_override in {
 else:
 
     ENABLE_LSTM = True
+
 
 # ============================================================
 # APPLICATION STARTUP INFORMATION
@@ -240,7 +192,6 @@ print(
     "LSTM enabled:",
     ENABLE_LSTM
 )
-
 
 if ENABLE_LSTM:
 
@@ -327,24 +278,6 @@ print(
 # ============================================================
 # LSTM VARIABLES
 # ============================================================
-#
-# LSTM is NOT loaded when Flask starts.
-#
-# It is loaded only when:
-#
-#     ENABLE_LSTM == True
-#
-# AND
-#
-#     user selects "lstm"
-#
-# On Render:
-#
-#     ENABLE_LSTM == False
-#
-# Therefore the TFLite model and tokenizer are never loaded.
-#
-# ============================================================
 
 lstm_interpreter = None
 
@@ -352,7 +285,7 @@ lstm_input_details = None
 
 lstm_output_details = None
 
-lstm_tokenizer = None
+lstm_word_index = None
 
 
 # ============================================================
@@ -362,6 +295,8 @@ lstm_tokenizer = None
 LSTM_MAX_SEQUENCE_LENGTH = 200
 
 LSTM_VOCAB_SIZE = 10000
+
+LSTM_OOV_TOKEN_ID = 1
 
 
 # ============================================================
@@ -460,11 +395,11 @@ def load_lstm_model():
     global lstm_interpreter
     global lstm_input_details
     global lstm_output_details
-    global lstm_tokenizer
+    global lstm_word_index
 
 
     # ========================================================
-    # HARD BLOCK WHEN LSTM IS DISABLED
+    # CHECK AVAILABILITY
     # ========================================================
 
     if not ENABLE_LSTM:
@@ -482,7 +417,7 @@ def load_lstm_model():
     if (
         lstm_interpreter is not None
         and
-        lstm_tokenizer is not None
+        lstm_word_index is not None
         and
         lstm_input_details is not None
         and
@@ -518,12 +453,12 @@ def load_lstm_model():
 
 
         # ====================================================
-        # TOKENIZER PATH
+        # WORD INDEX PATH
         # ====================================================
 
-        tokenizer_path = (
+        word_index_path = (
             MODEL_DIR /
-            "lstm_tokenizer.pkl"
+            "lstm_word_index.pkl"
         )
 
 
@@ -533,8 +468,8 @@ def load_lstm_model():
         )
 
         print(
-            "Tokenizer:",
-            tokenizer_path
+            "Word index:",
+            word_index_path
         )
 
 
@@ -551,14 +486,14 @@ def load_lstm_model():
 
 
         # ====================================================
-        # CHECK TOKENIZER
+        # CHECK WORD INDEX
         # ====================================================
 
-        if not tokenizer_path.exists():
+        if not word_index_path.exists():
 
             raise FileNotFoundError(
-                "LSTM tokenizer not found: "
-                f"{tokenizer_path}"
+                "LSTM word index not found: "
+                f"{word_index_path}"
             )
 
 
@@ -637,51 +572,42 @@ def load_lstm_model():
 
 
         # ====================================================
-        # LOAD TOKENIZER
+        # LOAD WORD INDEX
         # ====================================================
 
         print(
-            "Loading LSTM tokenizer..."
+            "Loading LSTM word index..."
         )
 
 
-        lstm_tokenizer = joblib.load(
-            tokenizer_path
-        )
-
-
-        print(
-            "LSTM tokenizer loaded successfully."
+        lstm_word_index = joblib.load(
+            word_index_path
         )
 
 
         # ====================================================
-        # TOKENIZER INFORMATION
+        # VALIDATE WORD INDEX
         # ====================================================
 
-        tokenizer_num_words = getattr(
-            lstm_tokenizer,
-            "num_words",
-            None
-        )
+        if not isinstance(
+            lstm_word_index,
+            dict
+        ):
+
+            raise RuntimeError(
+                "lstm_word_index.pkl must contain "
+                "a Python dictionary."
+            )
 
 
-        tokenizer_word_index = getattr(
-            lstm_tokenizer,
-            "word_index",
-            {}
+        print(
+            "LSTM word index loaded successfully."
         )
 
 
         print(
-            "Tokenizer num_words:",
-            tokenizer_num_words
-        )
-
-
-        print(
-            "Tokenizer vocabulary:",
-            len(tokenizer_word_index)
+            "Word index vocabulary:",
+            len(lstm_word_index)
         )
 
 
@@ -749,7 +675,7 @@ def load_lstm_model():
 
         lstm_output_details = None
 
-        lstm_tokenizer = None
+        lstm_word_index = None
 
 
         raise RuntimeError(
@@ -758,15 +684,31 @@ def load_lstm_model():
 
 
 # ============================================================
-# LSTM TOKENIZATION
+# LSTM TOKENIZATION WITHOUT KERAS
+# ============================================================
+#
+# IMPORTANT:
+#
+# We are NOT using:
+#
+#     keras.preprocessing.text.Tokenizer
+#
+# Therefore TensorFlow is NOT required.
+#
+# The saved lstm_word_index.pkl contains:
+#
+#     word -> integer ID
+#
+# We reproduce the tokenization manually.
+#
 # ============================================================
 
 def prepare_lstm_input(text):
 
-    if lstm_tokenizer is None:
+    if lstm_word_index is None:
 
         raise RuntimeError(
-            "LSTM tokenizer has not been loaded."
+            "LSTM word index has not been loaded."
         )
 
 
@@ -778,38 +720,63 @@ def prepare_lstm_input(text):
 
 
     # ========================================================
-    # TEXT -> TOKEN IDS
+    # NORMALIZE TEXT
     # ========================================================
 
-    sequences = (
-        lstm_tokenizer.texts_to_sequences(
-            [text]
+    text = str(text).lower().strip()
+
+
+    # ========================================================
+    # BASIC TOKENIZATION
+    #
+    # The original model must have been trained using a
+    # compatible word-based tokenizer.
+    #
+    # This splits text on whitespace.
+    #
+    # ========================================================
+
+    words = text.split()
+
+
+    # ========================================================
+    # WORDS -> TOKEN IDS
+    # ========================================================
+
+    sequence = []
+
+
+    for word in words:
+
+        # ----------------------------------------------------
+        # Remove basic punctuation around words
+        # ----------------------------------------------------
+
+        word = word.strip(
+            ".,!?;:\"'()[]{}<>/\\|@#$%^&*-_=+"
         )
-    )
 
 
-    if not sequences:
+        if not word:
 
-        sequence = []
-
-    else:
-
-        sequence = sequences[0]
+            continue
 
 
-    # ========================================================
-    # SAFETY FILTER
-    #
-    # Valid IDs:
-    #
-    # 1 <= token ID < 10000
-    #
-    # ========================================================
+        # ----------------------------------------------------
+        # Look up word
+        # ----------------------------------------------------
 
-    safe_sequence = []
+        token_id = (
+            lstm_word_index.get(
+                word,
+                LSTM_OOV_TOKEN_ID
+            )
+        )
 
 
-    for token_id in sequence:
+        # ----------------------------------------------------
+        # Convert ID
+        # ----------------------------------------------------
 
         try:
 
@@ -822,8 +789,14 @@ def prepare_lstm_input(text):
             ValueError
         ):
 
-            continue
+            token_id = (
+                LSTM_OOV_TOKEN_ID
+            )
 
+
+        # ----------------------------------------------------
+        # Vocabulary safety
+        # ----------------------------------------------------
 
         if (
             token_id > 0
@@ -831,20 +804,36 @@ def prepare_lstm_input(text):
             token_id < LSTM_VOCAB_SIZE
         ):
 
-            safe_sequence.append(
+            sequence.append(
                 token_id
+            )
+
+        else:
+
+            sequence.append(
+                LSTM_OOV_TOKEN_ID
             )
 
 
     # ========================================================
     # LIMIT SEQUENCE LENGTH
     # ========================================================
+    #
+    # Keras pad_sequences commonly uses:
+    #
+    #     maxlen=200
+    #     padding="pre"
+    #     truncating="pre"
+    #
+    # We reproduce that behavior here.
+    #
+    # ========================================================
 
-    safe_sequence = (
-        safe_sequence[
-            :LSTM_MAX_SEQUENCE_LENGTH
+    if len(sequence) > LSTM_MAX_SEQUENCE_LENGTH:
+
+        sequence = sequence[
+            -LSTM_MAX_SEQUENCE_LENGTH:
         ]
-    )
 
 
     # ========================================================
@@ -857,42 +846,84 @@ def prepare_lstm_input(text):
 
 
     # ========================================================
+    # EXPECTED MODEL SHAPE
+    # ========================================================
+
+    expected_shape = tuple(
+        lstm_input_details[0]["shape"]
+    )
+
+
+    # ========================================================
+    # DETERMINE SEQUENCE LENGTH
+    # ========================================================
+
+    if len(expected_shape) == 2:
+
+        sequence_length = (
+            int(expected_shape[1])
+        )
+
+    else:
+
+        sequence_length = (
+            LSTM_MAX_SEQUENCE_LENGTH
+        )
+
+
+    # ========================================================
     # CREATE PADDED INPUT
     # ========================================================
 
     padded_sequence = np.zeros(
         (
             1,
-            LSTM_MAX_SEQUENCE_LENGTH
+            sequence_length
         ),
         dtype=input_dtype
     )
 
 
     # ========================================================
-    # INSERT TOKENS
+    # PRE-PADDING
     # ========================================================
 
-    if safe_sequence:
+    if sequence:
+
+        actual_length = min(
+            len(sequence),
+            sequence_length
+        )
+
+
+        sequence_to_insert = (
+            sequence[-actual_length:]
+        )
+
 
         padded_sequence[
             0,
-            :len(safe_sequence)
-        ] = safe_sequence
+            -actual_length:
+        ] = sequence_to_insert
 
 
     # ========================================================
-    # DEBUG
+    # DEBUG INFORMATION
     # ========================================================
 
     print(
-        "Original token count:",
+        "Original word count:",
+        len(words)
+    )
+
+    print(
+        "Token count:",
         len(sequence)
     )
 
     print(
-        "Valid token count:",
-        len(safe_sequence)
+        "Sequence length:",
+        sequence_length
     )
 
     print(
@@ -956,10 +987,6 @@ def predict_text(
         )
 
 
-        # ====================================================
-        # VECTORIZE
-        # ====================================================
-
         text_vector = (
             vectorizer.transform(
                 [cleaned_text]
@@ -967,20 +994,12 @@ def predict_text(
         )
 
 
-        # ====================================================
-        # PREDICTION
-        # ====================================================
-
         prediction = int(
             model.predict(
                 text_vector
             )[0]
         )
 
-
-        # ====================================================
-        # PROBABILITY
-        # ====================================================
 
         if hasattr(
             model,
@@ -1019,10 +1038,6 @@ def predict_text(
 
     elif selected_model == "lstm":
 
-        # ----------------------------------------------------
-        # Render / disabled protection
-        # ----------------------------------------------------
-
         if not ENABLE_LSTM:
 
             raise RuntimeError(
@@ -1038,7 +1053,7 @@ def predict_text(
 
 
         # ====================================================
-        # LOAD LSTM
+        # LOAD MODEL + WORD INDEX
         # ====================================================
 
         load_lstm_model()
@@ -1320,10 +1335,6 @@ def generate_result_pdf(
     y = height - 60
 
 
-    # ========================================================
-    # HEADER
-    # ========================================================
-
     pdf.setFont(
         "Helvetica-Bold",
         24
@@ -1356,10 +1367,6 @@ def generate_result_pdf(
     y -= 45
 
 
-    # ========================================================
-    # RESULT
-    # ========================================================
-
     pdf.setFont(
         "Helvetica-Bold",
         20
@@ -1375,10 +1382,6 @@ def generate_result_pdf(
 
     y -= 35
 
-
-    # ========================================================
-    # DETAILS
-    # ========================================================
 
     details = [
 
@@ -1447,10 +1450,6 @@ def generate_result_pdf(
 
     y -= 20
 
-
-    # ========================================================
-    # ANALYZED TEXT
-    # ========================================================
 
     pdf.setFont(
         "Helvetica-Bold",
@@ -1566,10 +1565,6 @@ def generate_result_png(
     )
 
 
-    # ========================================================
-    # FONTS
-    # ========================================================
-
     try:
 
         font_title = ImageFont.truetype(
@@ -1603,10 +1598,6 @@ def generate_result_png(
         font_small = font_title
 
 
-    # ========================================================
-    # HEADER
-    # ========================================================
-
     draw.text(
         (60, 45),
         "AI News Intelligence",
@@ -1623,10 +1614,6 @@ def generate_result_png(
     )
 
 
-    # ========================================================
-    # RESULT
-    # ========================================================
-
     result_text = (
         f'{result["result"]}  |  '
         f'{result["confidence"]}%'
@@ -1640,10 +1627,6 @@ def generate_result_png(
         font=font_heading
     )
 
-
-    # ========================================================
-    # CONFIDENCE BAR
-    # ========================================================
 
     bar_x = 60
 
@@ -1700,10 +1683,6 @@ def generate_result_png(
     )
 
 
-    # ========================================================
-    # DETAILS
-    # ========================================================
-
     details = [
 
         f'Model: {result["model"]}',
@@ -1733,10 +1712,6 @@ def generate_result_png(
 
         y += 42
 
-
-    # ========================================================
-    # DISCLAIMER
-    # ========================================================
 
     draw.text(
         (60, 590),
@@ -1812,10 +1787,6 @@ def predict():
             }), 400
 
 
-        # ====================================================
-        # TEXT
-        # ====================================================
-
         text = (
             data.get(
                 "text",
@@ -1824,10 +1795,6 @@ def predict():
             .strip()
         )
 
-
-        # ====================================================
-        # MODEL
-        # ====================================================
 
         selected_model = data.get(
             "model",
@@ -1841,10 +1808,6 @@ def predict():
             .lower()
         )
 
-
-        # ====================================================
-        # VALID MODEL
-        # ====================================================
 
         if selected_model not in {
             "tfidf",
@@ -1860,10 +1823,6 @@ def predict():
             }), 400
 
 
-        # ====================================================
-        # RENDER LSTM BLOCK
-        # ====================================================
-
         if (
             selected_model == "lstm"
             and
@@ -1874,14 +1833,10 @@ def predict():
 
                 "error":
                     "LSTM is not available on the "
-                    "Render deployment. Please select TF-IDF."
+                    "deployed server. Please select TF-IDF."
 
             }), 400
 
-
-        # ====================================================
-        # TEXT VALIDATION
-        # ====================================================
 
         if not text:
 
@@ -1918,19 +1873,11 @@ def predict():
         )
 
 
-        # ====================================================
-        # PREDICTION
-        # ====================================================
-
         result = predict_text(
             text,
             selected_model
         )
 
-
-        # ====================================================
-        # SOURCE
-        # ====================================================
 
         source_type = "Typed Text"
 
@@ -1944,10 +1891,6 @@ def predict():
         )
 
 
-        # ====================================================
-        # PDF
-        # ====================================================
-
         pdf_filename = (
             generate_result_pdf(
                 result,
@@ -1957,10 +1900,6 @@ def predict():
         )
 
 
-        # ====================================================
-        # PNG
-        # ====================================================
-
         png_filename = (
             generate_result_png(
                 result,
@@ -1969,10 +1908,6 @@ def predict():
             )
         )
 
-
-        # ====================================================
-        # DOWNLOAD URLS
-        # ====================================================
 
         result["pdf_url"] = (
             f"/download/{pdf_filename}"
@@ -2047,20 +1982,12 @@ def upload():
 
     try:
 
-        # ====================================================
-        # FILE
-        # ====================================================
-
         uploaded_file = (
             request.files.get(
                 "file"
             )
         )
 
-
-        # ====================================================
-        # MODEL
-        # ====================================================
 
         selected_model = (
             request.form.get(
@@ -2077,10 +2004,6 @@ def upload():
         )
 
 
-        # ====================================================
-        # VALID MODEL
-        # ====================================================
-
         if selected_model not in {
             "tfidf",
             "lstm"
@@ -2095,10 +2018,6 @@ def upload():
             }), 400
 
 
-        # ====================================================
-        # RENDER LSTM BLOCK
-        # ====================================================
-
         if (
             selected_model == "lstm"
             and
@@ -2109,14 +2028,10 @@ def upload():
 
                 "error":
                     "LSTM is not available on the "
-                    "Render deployment. Please select TF-IDF."
+                    "deployed server. Please select TF-IDF."
 
             }), 400
 
-
-        # ====================================================
-        # FILE VALIDATION
-        # ====================================================
 
         if not uploaded_file:
 
@@ -2133,10 +2048,6 @@ def upload():
         )
 
 
-        # ====================================================
-        # EXTENSION
-        # ====================================================
-
         if not allowed_file(filename):
 
             return jsonify({
@@ -2148,10 +2059,6 @@ def upload():
 
             }), 400
 
-
-        # ====================================================
-        # READ FILE
-        # ====================================================
 
         file_bytes = (
             uploaded_file.read()
@@ -2188,10 +2095,6 @@ def upload():
         )
 
 
-        # ====================================================
-        # EXTRACT TEXT
-        # ====================================================
-
         (
             extracted_text,
             source_type,
@@ -2202,20 +2105,12 @@ def upload():
         )
 
 
-        # ====================================================
-        # NORMALIZE TEXT
-        # ====================================================
-
         extracted_text = (
             normalize_extracted_text(
                 extracted_text
             )
         )
 
-
-        # ====================================================
-        # VALIDATE EXTRACTED TEXT
-        # ====================================================
 
         if not extracted_text:
 
@@ -2239,19 +2134,11 @@ def upload():
             }), 400
 
 
-        # ====================================================
-        # PREDICTION
-        # ====================================================
-
         result = predict_text(
             extracted_text,
             selected_model
         )
 
-
-        # ====================================================
-        # SOURCE INFORMATION
-        # ====================================================
 
         result["source_type"] = (
             source_type
@@ -2268,10 +2155,6 @@ def upload():
         )
 
 
-        # ====================================================
-        # PDF
-        # ====================================================
-
         pdf_filename = (
             generate_result_pdf(
                 result,
@@ -2281,10 +2164,6 @@ def upload():
         )
 
 
-        # ====================================================
-        # PNG
-        # ====================================================
-
         png_filename = (
             generate_result_png(
                 result,
@@ -2293,10 +2172,6 @@ def upload():
             )
         )
 
-
-        # ====================================================
-        # DOWNLOAD URLS
-        # ====================================================
 
         result["pdf_url"] = (
             f"/download/{pdf_filename}"
@@ -2408,6 +2283,7 @@ def internal_server_error(error):
             "Check the server logs."
 
     }), 500
+
 
 # ============================================================
 # START APPLICATION
