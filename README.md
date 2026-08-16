@@ -377,6 +377,8 @@ AI-News-Intelligence/
 ├── app.py
 ├── Dockerfile
 ├── requirements.txt
+├── README.md
+├── LICENSE
 ├── convert_lstm_tflite.py
 ├── test_lstm_tflite.py
 │
