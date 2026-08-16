@@ -3,6 +3,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Render will run TF-IDF only.
+# LSTM remains available in your local environment.
+ENV AI_NEWS_ENABLE_LSTM=0
+
 WORKDIR /app
 
 # System packages required by Tesseract OCR and PyMuPDF/Pillow
@@ -25,6 +29,8 @@ RUN python -c "import nltk; nltk.download('stopwords', download_dir='/usr/local/
 COPY . .
 
 ENV TESSERACT_CMD=/usr/bin/tesseract
+ENV NLTK_DATA=/usr/local/share/nltk_data
 
-# One worker = lower memory usage
+# One worker + one thread keeps memory usage low.
+# Render supplies $PORT automatically.
 CMD ["sh", "-c", "exec gunicorn --workers 1 --threads 1 --timeout 120 --bind 0.0.0.0:${PORT:-10000} app:app"]

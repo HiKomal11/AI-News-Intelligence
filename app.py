@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+import os
 import traceback
 
 import joblib
@@ -52,6 +53,7 @@ GENERATED_DIR = BASE_DIR / "results" / "generated"
 
 
 UPLOAD_DIR.mkdir(
+    parents=True,
     exist_ok=True
 )
 
@@ -65,54 +67,294 @@ GENERATED_DIR.mkdir(
 # FILE SETTINGS
 # ============================================================
 
-# 16 MB maximum upload
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+# Maximum uploaded file size: 16 MB
+
+app.config["MAX_CONTENT_LENGTH"] = (
+    16 * 1024 * 1024
+)
 
 
 # ============================================================
-# TF-IDF MODEL
+# ENVIRONMENT DETECTION
+# ============================================================
+#
+# LOCAL:
+#     LSTM available
+#
+# RENDER:
+#     LSTM disabled
+#
+# Render automatically provides the RENDER environment
+# variable.
+#
+# We also support:
+#
+#     AI_NEWS_ENV=render
+#
+# or:
+#
+#     AI_NEWS_ENABLE_LSTM=0
+#
+# ============================================================
+
+def is_render_environment():
+
+    # --------------------------------------------------------
+    # Render's built-in environment variable
+    # --------------------------------------------------------
+
+    render_variable = (
+        os.getenv(
+            "RENDER",
+            ""
+        )
+        .strip()
+        .lower()
+    )
+
+    if render_variable in {
+        "1",
+        "true",
+        "yes",
+        "on"
+    }:
+
+        return True
+
+
+    # --------------------------------------------------------
+    # Optional custom environment variable
+    # --------------------------------------------------------
+
+    ai_news_env = (
+        os.getenv(
+            "AI_NEWS_ENV",
+            ""
+        )
+        .strip()
+        .lower()
+    )
+
+    if ai_news_env == "render":
+
+        return True
+
+
+    # --------------------------------------------------------
+    # Otherwise assume local
+    # --------------------------------------------------------
+
+    return False
+
+
+# ============================================================
+# ENVIRONMENT NAME
+# ============================================================
+
+IS_RENDER = is_render_environment()
+
+ENVIRONMENT_NAME = (
+    "render"
+    if IS_RENDER
+    else "local"
+)
+
+
+# ============================================================
+# LSTM AVAILABILITY
+# ============================================================
+#
+# Default behavior:
+#
+# LOCAL  -> LSTM enabled
+# RENDER -> LSTM disabled
+#
+# Optional override:
+#
+# AI_NEWS_ENABLE_LSTM=1
+# AI_NEWS_ENABLE_LSTM=0
+#
+# IMPORTANT:
+#
+# Render is always blocked unless you intentionally change
+# this code.
+#
+# This prevents accidental LSTM activation on Render.
+# ============================================================
+
+lstm_override = (
+    os.getenv(
+        "AI_NEWS_ENABLE_LSTM",
+        ""
+    )
+    .strip()
+    .lower()
+)
+
+
+if IS_RENDER:
+
+    # --------------------------------------------------------
+    # Render = TF-IDF only
+    # --------------------------------------------------------
+
+    ENABLE_LSTM = False
+
+else:
+
+    # --------------------------------------------------------
+    # Local = TF-IDF + LSTM by default
+    # --------------------------------------------------------
+
+    if lstm_override in {
+        "0",
+        "false",
+        "no",
+        "off"
+    }:
+
+        ENABLE_LSTM = False
+
+    else:
+
+        ENABLE_LSTM = True
+
+
+# ============================================================
+# APPLICATION STARTUP INFORMATION
+# ============================================================
+
+print()
+print("======================================")
+print("       AI NEWS INTELLIGENCE")
+print("======================================")
+
+print(
+    "Environment:",
+    ENVIRONMENT_NAME
+)
+
+print(
+    "Render detected:",
+    IS_RENDER
+)
+
+print(
+    "LSTM enabled:",
+    ENABLE_LSTM
+)
+
+
+if ENABLE_LSTM:
+
+    print(
+        "Available models: TF-IDF + LSTM"
+    )
+
+else:
+
+    print(
+        "Available models: TF-IDF only"
+    )
+
+print("======================================")
+print()
+
+
+# ============================================================
+# LOAD TF-IDF MODEL
 # ============================================================
 
 print("======================================")
 print("Loading TF-IDF vectorizer...")
 print("======================================")
 
-vectorizer = joblib.load(
-    MODEL_DIR / "tfidf_vectorizer.pkl"
+
+TFIDF_VECTOR_PATH = (
+    MODEL_DIR /
+    "tfidf_vectorizer.pkl"
 )
 
-print("TF-IDF vectorizer loaded successfully.")
 
+if not TFIDF_VECTOR_PATH.exists():
+
+    raise FileNotFoundError(
+        "TF-IDF vectorizer not found: "
+        f"{TFIDF_VECTOR_PATH}"
+    )
+
+
+vectorizer = joblib.load(
+    TFIDF_VECTOR_PATH
+)
+
+
+print(
+    "TF-IDF vectorizer loaded successfully."
+)
+
+
+# ============================================================
+# LOAD LOGISTIC REGRESSION
+# ============================================================
 
 print("======================================")
 print("Loading Logistic Regression model...")
 print("======================================")
 
-model = joblib.load(
-    MODEL_DIR / "logistic_regression.pkl"
+
+LOGISTIC_MODEL_PATH = (
+    MODEL_DIR /
+    "logistic_regression.pkl"
 )
 
-print("Logistic Regression model loaded successfully.")
+
+if not LOGISTIC_MODEL_PATH.exists():
+
+    raise FileNotFoundError(
+        "Logistic Regression model not found: "
+        f"{LOGISTIC_MODEL_PATH}"
+    )
+
+
+model = joblib.load(
+    LOGISTIC_MODEL_PATH
+)
+
+
+print(
+    "Logistic Regression model loaded successfully."
+)
 
 
 # ============================================================
 # LSTM VARIABLES
 # ============================================================
-
-# IMPORTANT:
 #
 # LSTM is NOT loaded when Flask starts.
 #
-# It is loaded only when the user selects:
+# It is loaded only when:
 #
-#     "lstm"
+#     ENABLE_LSTM == True
 #
-# This reduces Render startup memory usage.
+# AND
+#
+#     user selects "lstm"
+#
+# On Render:
+#
+#     ENABLE_LSTM == False
+#
+# Therefore the TFLite model and tokenizer are never loaded.
+#
 # ============================================================
 
 lstm_interpreter = None
+
 lstm_input_details = None
+
 lstm_output_details = None
+
 lstm_tokenizer = None
 
 
@@ -120,21 +362,8 @@ lstm_tokenizer = None
 # LSTM SETTINGS
 # ============================================================
 
-# Your TFLite model input is:
-#
-# [1, 200]
-#
 LSTM_MAX_SEQUENCE_LENGTH = 200
 
-
-# Your tokenizer has:
-#
-# num_words = 10000
-#
-# Therefore valid IDs are:
-#
-# 1 ... 9999
-#
 LSTM_VOCAB_SIZE = 10000
 
 
@@ -142,12 +371,86 @@ LSTM_VOCAB_SIZE = 10000
 # HEALTH CHECK
 # ============================================================
 
-@app.route("/health", methods=["GET"])
+@app.route(
+    "/health",
+    methods=["GET"]
+)
 def health():
 
     return jsonify({
-        "status": "ok",
-        "service": "AI News Intelligence"
+
+        "status":
+            "ok",
+
+        "service":
+            "AI News Intelligence",
+
+        "environment":
+            ENVIRONMENT_NAME,
+
+        "render":
+            IS_RENDER,
+
+        "tfidf":
+            True,
+
+        "lstm":
+            ENABLE_LSTM,
+
+        "available_models":
+            (
+                ["tfidf", "lstm"]
+                if ENABLE_LSTM
+                else
+                ["tfidf"]
+            )
+
+    }), 200
+
+
+# ============================================================
+# AVAILABLE MODELS
+# ============================================================
+
+@app.route(
+    "/models",
+    methods=["GET"]
+)
+def available_models():
+
+    models = {
+
+        "tfidf": {
+
+            "name":
+                "TF-IDF + Logistic Regression",
+
+            "available":
+                True
+
+        },
+
+        "lstm": {
+
+            "name":
+                "LSTM Neural Network (TFLite)",
+
+            "available":
+                ENABLE_LSTM
+
+        }
+
+    }
+
+
+    return jsonify({
+
+        "environment":
+            ENVIRONMENT_NAME,
+
+        "models":
+            models
+
     }), 200
 
 
@@ -162,53 +465,70 @@ def load_lstm_model():
     global lstm_output_details
     global lstm_tokenizer
 
-    # --------------------------------------------------------
-    # Already loaded
-    # --------------------------------------------------------
+
+    # ========================================================
+    # HARD BLOCK WHEN LSTM IS DISABLED
+    # ========================================================
+
+    if not ENABLE_LSTM:
+
+        raise RuntimeError(
+            "LSTM is not available on this deployment. "
+            "Please select TF-IDF."
+        )
+
+
+    # ========================================================
+    # ALREADY LOADED
+    # ========================================================
 
     if (
         lstm_interpreter is not None
-        and lstm_tokenizer is not None
+        and
+        lstm_tokenizer is not None
+        and
+        lstm_input_details is not None
+        and
+        lstm_output_details is not None
     ):
+
         return
+
 
     try:
 
-        print("\n======================================")
+        print()
+        print("======================================")
         print("Loading LSTM TFLite model...")
         print("======================================")
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # LiteRT
-        # ----------------------------------------------------
+        # ====================================================
 
         from ai_edge_litert.interpreter import Interpreter
 
-        # ----------------------------------------------------
-        # MODEL
-        # ----------------------------------------------------
+
+        # ====================================================
+        # MODEL PATH
+        # ====================================================
 
         model_path = (
             MODEL_DIR /
             "lstm_news_classifier.tflite"
         )
 
-        # ----------------------------------------------------
-        # TOKENIZER
-        #
-        # IMPORTANT:
-        #
-        # We use lstm_tokenizer.pkl
-        #
-        # NOT:
-        #
-        # lstm_word_index.pkl
-        # ----------------------------------------------------
+
+        # ====================================================
+        # TOKENIZER PATH
+        # ====================================================
 
         tokenizer_path = (
             MODEL_DIR /
             "lstm_tokenizer.pkl"
         )
+
 
         print(
             "TFLite model:",
@@ -220,94 +540,93 @@ def load_lstm_model():
             tokenizer_path
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # CHECK MODEL
-        # ----------------------------------------------------
+        # ====================================================
 
         if not model_path.exists():
 
             raise FileNotFoundError(
-                f"TFLite model not found: {model_path}"
+                "TFLite model not found: "
+                f"{model_path}"
             )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # CHECK TOKENIZER
-        # ----------------------------------------------------
+        # ====================================================
 
         if not tokenizer_path.exists():
 
             raise FileNotFoundError(
-                f"LSTM tokenizer not found: {tokenizer_path}"
+                "LSTM tokenizer not found: "
+                f"{tokenizer_path}"
             )
 
-        # ----------------------------------------------------
-        # LOAD TFLITE
-        # ----------------------------------------------------
+
+        # ====================================================
+        # LOAD INTERPRETER
+        # ====================================================
 
         lstm_interpreter = Interpreter(
             model_path=str(model_path),
             num_threads=1
         )
 
+
+        # ====================================================
+        # ALLOCATE TENSORS
+        # ====================================================
+
         lstm_interpreter.allocate_tensors()
 
-        # ----------------------------------------------------
-        # INPUT
-        # ----------------------------------------------------
+
+        # ====================================================
+        # INPUT DETAILS
+        # ====================================================
 
         lstm_input_details = (
             lstm_interpreter.get_input_details()
         )
 
-        # ----------------------------------------------------
-        # OUTPUT
-        # ----------------------------------------------------
+
+        if not lstm_input_details:
+
+            raise RuntimeError(
+                "LSTM model has no input tensor."
+            )
+
+
+        # ====================================================
+        # OUTPUT DETAILS
+        # ====================================================
 
         lstm_output_details = (
             lstm_interpreter.get_output_details()
         )
 
-        print(
-            "TFLite model loaded successfully."
-        )
-
-        # ----------------------------------------------------
-        # VERIFY INPUT
-        # ----------------------------------------------------
-
-        if not lstm_input_details:
-
-            raise RuntimeError(
-                "TFLite model has no input tensor."
-            )
-
-        input_shape = (
-            lstm_input_details[0]["shape"]
-        )
-
-        input_dtype = (
-            lstm_input_details[0]["dtype"]
-        )
-
-        print(
-            "LSTM input shape:",
-            input_shape
-        )
-
-        print(
-            "LSTM input dtype:",
-            input_dtype
-        )
-
-        # ----------------------------------------------------
-        # VERIFY OUTPUT
-        # ----------------------------------------------------
 
         if not lstm_output_details:
 
             raise RuntimeError(
-                "TFLite model has no output tensor."
+                "LSTM model has no output tensor."
             )
+
+
+        # ====================================================
+        # MODEL INFORMATION
+        # ====================================================
+
+        print(
+            "LSTM input shape:",
+            lstm_input_details[0]["shape"]
+        )
+
+        print(
+            "LSTM input dtype:",
+            lstm_input_details[0]["dtype"]
+        )
 
         print(
             "LSTM output shape:",
@@ -319,25 +638,29 @@ def load_lstm_model():
             lstm_output_details[0]["dtype"]
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # LOAD TOKENIZER
-        # ----------------------------------------------------
+        # ====================================================
 
         print(
             "Loading LSTM tokenizer..."
         )
 
+
         lstm_tokenizer = joblib.load(
             tokenizer_path
         )
+
 
         print(
             "LSTM tokenizer loaded successfully."
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # TOKENIZER INFORMATION
-        # ----------------------------------------------------
+        # ====================================================
 
         tokenizer_num_words = getattr(
             lstm_tokenizer,
@@ -345,84 +668,92 @@ def load_lstm_model():
             None
         )
 
+
         tokenizer_word_index = getattr(
             lstm_tokenizer,
             "word_index",
             {}
         )
 
+
         print(
             "Tokenizer num_words:",
             tokenizer_num_words
         )
+
 
         print(
             "Tokenizer vocabulary:",
             len(tokenizer_word_index)
         )
 
-        if tokenizer_word_index:
-
-            print(
-                "Tokenizer maximum index:",
-                max(
-                    tokenizer_word_index.values()
-                )
-            )
-
-        # ----------------------------------------------------
-        # FINAL
-        # ----------------------------------------------------
 
         print(
             "LSTM vocabulary limit:",
             LSTM_VOCAB_SIZE
         )
 
+
         print(
             "LSTM sequence length:",
             LSTM_MAX_SEQUENCE_LENGTH
         )
 
+
         print(
             "LSTM initialization completed."
         )
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
+
+        print()
+
 
     except Exception as e:
 
-        print(
-            "\n======================================"
-        )
+        print()
+        print("======================================")
+        print("LSTM TFLITE ERROR")
+        print("======================================")
 
-        print(
-            "LSTM TFLITE ERROR"
-        )
 
         print(
             "Error type:",
             type(e).__name__
         )
 
+
         print(
             "Error:",
             str(e)
         )
 
+
         traceback.print_exc()
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
 
-        # Reset
+        print()
+
+
+        # ====================================================
+        # RESET
+        # ====================================================
+
         lstm_interpreter = None
+
         lstm_input_details = None
+
         lstm_output_details = None
+
         lstm_tokenizer = None
+
 
         raise RuntimeError(
             f"Failed to load LSTM model: {str(e)}"
@@ -441,15 +772,24 @@ def prepare_lstm_input(text):
             "LSTM tokenizer has not been loaded."
         )
 
-    # --------------------------------------------------------
-    # Convert text to token IDs
-    # --------------------------------------------------------
+
+    if lstm_input_details is None:
+
+        raise RuntimeError(
+            "LSTM input details are unavailable."
+        )
+
+
+    # ========================================================
+    # TEXT -> TOKEN IDS
+    # ========================================================
 
     sequences = (
         lstm_tokenizer.texts_to_sequences(
             [text]
         )
     )
+
 
     if not sequences:
 
@@ -459,54 +799,69 @@ def prepare_lstm_input(text):
 
         sequence = sequences[0]
 
-    # --------------------------------------------------------
+
+    # ========================================================
     # SAFETY FILTER
     #
-    # This is important because:
+    # Valid IDs:
     #
-    # tokenizer vocabulary = 91800
+    # 1 <= token ID < 10000
     #
-    # model vocabulary = 10000
-    #
-    # Any ID >= 10000 can cause:
-    #
-    # GATHER index out of bounds
-    # --------------------------------------------------------
+    # ========================================================
 
     safe_sequence = []
 
+
     for token_id in sequence:
 
-        token_id = int(token_id)
+        try:
+
+            token_id = int(
+                token_id
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            continue
+
 
         if (
             token_id > 0
-            and token_id < LSTM_VOCAB_SIZE
+            and
+            token_id < LSTM_VOCAB_SIZE
         ):
 
             safe_sequence.append(
                 token_id
             )
 
-    # --------------------------------------------------------
-    # Limit to 200 tokens
-    # --------------------------------------------------------
 
-    safe_sequence = safe_sequence[
-        :LSTM_MAX_SEQUENCE_LENGTH
-    ]
+    # ========================================================
+    # LIMIT SEQUENCE LENGTH
+    # ========================================================
 
-    # --------------------------------------------------------
-    # Get model dtype
-    # --------------------------------------------------------
+    safe_sequence = (
+        safe_sequence[
+            :LSTM_MAX_SEQUENCE_LENGTH
+        ]
+    )
+
+
+    # ========================================================
+    # MODEL INPUT DTYPE
+    # ========================================================
 
     input_dtype = (
         lstm_input_details[0]["dtype"]
     )
 
-    # --------------------------------------------------------
-    # Create input
-    # --------------------------------------------------------
+
+    # ========================================================
+    # CREATE PADDED INPUT
+    # ========================================================
 
     padded_sequence = np.zeros(
         (
@@ -516,9 +871,10 @@ def prepare_lstm_input(text):
         dtype=input_dtype
     )
 
-    # --------------------------------------------------------
-    # Insert tokens
-    # --------------------------------------------------------
+
+    # ========================================================
+    # INSERT TOKENS
+    # ========================================================
 
     if safe_sequence:
 
@@ -527,9 +883,10 @@ def prepare_lstm_input(text):
             :len(safe_sequence)
         ] = safe_sequence
 
-    # --------------------------------------------------------
-    # Debug
-    # --------------------------------------------------------
+
+    # ========================================================
+    # DEBUG
+    # ========================================================
 
     print(
         "Original token count:",
@@ -541,24 +898,6 @@ def prepare_lstm_input(text):
         len(safe_sequence)
     )
 
-    if safe_sequence:
-
-        print(
-            "Minimum token ID:",
-            min(safe_sequence)
-        )
-
-        print(
-            "Maximum token ID:",
-            max(safe_sequence)
-        )
-
-    else:
-
-        print(
-            "No valid vocabulary tokens found."
-        )
-
     print(
         "Input shape:",
         padded_sequence.shape
@@ -568,6 +907,7 @@ def prepare_lstm_input(text):
         "Input dtype:",
         padded_sequence.dtype
     )
+
 
     return padded_sequence
 
@@ -581,11 +921,14 @@ def predict_text(
     selected_model: str
 ) -> dict:
 
-    # --------------------------------------------------------
-    # Clean text
-    # --------------------------------------------------------
+    # ========================================================
+    # CLEAN TEXT
+    # ========================================================
 
-    cleaned_text = clean_text(text)
+    cleaned_text = clean_text(
+        text
+    )
+
 
     if not cleaned_text:
 
@@ -593,12 +936,17 @@ def predict_text(
             "No usable text was found after preprocessing."
         )
 
-    # Normalize model name
+
+    # ========================================================
+    # NORMALIZE MODEL
+    # ========================================================
+
     selected_model = (
         str(selected_model)
         .strip()
         .lower()
     )
+
 
     # ========================================================
     # TF-IDF
@@ -610,9 +958,10 @@ def predict_text(
             "Running TF-IDF prediction..."
         )
 
-        # ----------------------------------------------------
-        # Vectorize
-        # ----------------------------------------------------
+
+        # ====================================================
+        # VECTORIZE
+        # ====================================================
 
         text_vector = (
             vectorizer.transform(
@@ -620,9 +969,10 @@ def predict_text(
             )
         )
 
-        # ----------------------------------------------------
-        # Prediction
-        # ----------------------------------------------------
+
+        # ====================================================
+        # PREDICTION
+        # ====================================================
 
         prediction = int(
             model.predict(
@@ -630,27 +980,41 @@ def predict_text(
             )[0]
         )
 
-        # ----------------------------------------------------
-        # Probability
-        # ----------------------------------------------------
 
-        probabilities = (
-            model.predict_proba(
-                text_vector
-            )[0]
-        )
+        # ====================================================
+        # PROBABILITY
+        # ====================================================
 
-        confidence = float(
-            max(probabilities) * 100
-        )
+        if hasattr(
+            model,
+            "predict_proba"
+        ):
+
+            probabilities = (
+                model.predict_proba(
+                    text_vector
+                )[0]
+            )
+
+
+            confidence = float(
+                max(probabilities) * 100
+            )
+
+        else:
+
+            confidence = 0.0
+
 
         model_name = (
             "TF-IDF + Logistic Regression"
         )
 
+
         print(
             "TF-IDF prediction completed."
         )
+
 
     # ========================================================
     # LSTM
@@ -658,27 +1022,34 @@ def predict_text(
 
     elif selected_model == "lstm":
 
-        print(
-            "\n======================================"
-        )
-
-        print(
-            "Running LSTM TFLite prediction..."
-        )
-
-        print(
-            "======================================"
-        )
-
         # ----------------------------------------------------
-        # Load only now
+        # Render / disabled protection
         # ----------------------------------------------------
+
+        if not ENABLE_LSTM:
+
+            raise RuntimeError(
+                "LSTM is not available on the deployed "
+                "server. Please select TF-IDF."
+            )
+
+
+        print()
+        print("======================================")
+        print("Running LSTM TFLite prediction...")
+        print("======================================")
+
+
+        # ====================================================
+        # LOAD LSTM
+        # ====================================================
 
         load_lstm_model()
 
-        # ----------------------------------------------------
-        # Prepare input
-        # ----------------------------------------------------
+
+        # ====================================================
+        # PREPARE INPUT
+        # ====================================================
 
         padded_sequence = (
             prepare_lstm_input(
@@ -686,37 +1057,38 @@ def predict_text(
             )
         )
 
-        # ----------------------------------------------------
-        # Input index
-        # ----------------------------------------------------
+
+        # ====================================================
+        # INPUT INDEX
+        # ====================================================
 
         input_index = (
             lstm_input_details[0]["index"]
         )
 
-        # ----------------------------------------------------
-        # Output index
-        # ----------------------------------------------------
+
+        # ====================================================
+        # OUTPUT INDEX
+        # ====================================================
 
         output_index = (
             lstm_output_details[0]["index"]
         )
 
-        # ----------------------------------------------------
-        # Safety check
-        # ----------------------------------------------------
 
-        expected_shape = (
-            tuple(
-                lstm_input_details[0]["shape"]
-            )
+        # ====================================================
+        # SHAPE VALIDATION
+        # ====================================================
+
+        expected_shape = tuple(
+            lstm_input_details[0]["shape"]
         )
 
-        actual_shape = (
-            tuple(
-                padded_sequence.shape
-            )
+
+        actual_shape = tuple(
+            padded_sequence.shape
         )
+
 
         print(
             "Expected input shape:",
@@ -728,44 +1100,36 @@ def predict_text(
             actual_shape
         )
 
+
         if actual_shape != expected_shape:
 
             raise RuntimeError(
-                f"LSTM input shape mismatch. "
+                "LSTM input shape mismatch. "
                 f"Expected {expected_shape}, "
                 f"got {actual_shape}"
             )
 
-        # ----------------------------------------------------
-        # Set input
-        # ----------------------------------------------------
+
+        # ====================================================
+        # SET INPUT
+        # ====================================================
 
         lstm_interpreter.set_tensor(
             input_index,
             padded_sequence
         )
 
-        print(
-            "Input tensor set successfully."
-        )
 
-        # ----------------------------------------------------
-        # Invoke
-        # ----------------------------------------------------
-
-        print(
-            "Invoking LSTM TFLite model..."
-        )
+        # ====================================================
+        # RUN MODEL
+        # ====================================================
 
         lstm_interpreter.invoke()
 
-        print(
-            "TFLite model invoked successfully."
-        )
 
-        # ----------------------------------------------------
-        # Output
-        # ----------------------------------------------------
+        # ====================================================
+        # GET OUTPUT
+        # ====================================================
 
         output = (
             lstm_interpreter.get_tensor(
@@ -773,14 +1137,16 @@ def predict_text(
             )
         )
 
+
         print(
-            "Raw output:",
+            "Raw LSTM output:",
             output
         )
 
-        # ----------------------------------------------------
-        # Validate
-        # ----------------------------------------------------
+
+        # ====================================================
+        # VALIDATE OUTPUT
+        # ====================================================
 
         if output is None:
 
@@ -788,9 +1154,11 @@ def predict_text(
                 "LSTM returned no output."
             )
 
+
         output = np.asarray(
             output
         )
+
 
         if output.size == 0:
 
@@ -798,17 +1166,15 @@ def predict_text(
                 "LSTM returned empty output."
             )
 
-        # ----------------------------------------------------
-        # Probability
-        # ----------------------------------------------------
+
+        # ====================================================
+        # PROBABILITY
+        # ====================================================
 
         probability = float(
             output.reshape(-1)[0]
         )
 
-        # ----------------------------------------------------
-        # Safety clamp
-        # ----------------------------------------------------
 
         probability = max(
             0.0,
@@ -818,17 +1184,19 @@ def predict_text(
             )
         )
 
+
         print(
             "LSTM probability:",
             probability
         )
 
-        # ----------------------------------------------------
-        # Classification
+
+        # ====================================================
+        # CLASSIFICATION
         #
         # 0 = Fake
         # 1 = Real
-        # ----------------------------------------------------
+        # ====================================================
 
         if probability >= 0.5:
 
@@ -846,13 +1214,16 @@ def predict_text(
                 (1 - probability) * 100
             )
 
+
         model_name = (
             "LSTM Neural Network (TFLite)"
         )
 
+
         print(
             "LSTM prediction completed."
         )
+
 
     # ========================================================
     # INVALID MODEL
@@ -863,6 +1234,7 @@ def predict_text(
         raise ValueError(
             f"Unknown model selected: {selected_model}"
         )
+
 
     # ========================================================
     # LABEL
@@ -880,32 +1252,36 @@ def predict_text(
 
         result = "Real News"
 
+
     # ========================================================
-    # RESULT
+    # RETURN
     # ========================================================
 
     return {
 
-        "prediction": label,
+        "prediction":
+            label,
 
-        "result": result,
+        "result":
+            result,
 
-        "confidence": round(
-            confidence,
-            2
-        ),
+        "confidence":
+            round(
+                confidence,
+                2
+            ),
 
-        "model": model_name,
+        "model":
+            model_name,
 
-        "word_count": len(
-            text.split()
-        ),
+        "word_count":
+            len(text.split()),
 
-        "character_count": len(
+        "character_count":
+            len(text),
+
+        "extracted_text":
             text
-        ),
-
-        "extracted_text": text
     }
 
 
@@ -919,33 +1295,43 @@ def generate_result_pdf(
     source_type: str
 ) -> str:
 
-    result_id = uuid4().hex[:12]
+    result_id = (
+        uuid4().hex[:12]
+    )
+
 
     filename = (
         f"news_analysis_{result_id}.pdf"
     )
 
+
     output_path = (
-        GENERATED_DIR / filename
+        GENERATED_DIR /
+        filename
     )
+
 
     pdf = canvas.Canvas(
         str(output_path),
         pagesize=A4
     )
 
+
     width, height = A4
+
 
     y = height - 60
 
-    # --------------------------------------------------------
-    # Header
-    # --------------------------------------------------------
+
+    # ========================================================
+    # HEADER
+    # ========================================================
 
     pdf.setFont(
         "Helvetica-Bold",
         24
     )
+
 
     pdf.drawString(
         50,
@@ -953,12 +1339,15 @@ def generate_result_pdf(
         "AI News Intelligence"
     )
 
+
     y -= 35
+
 
     pdf.setFont(
         "Helvetica",
         12
     )
+
 
     pdf.drawString(
         50,
@@ -966,16 +1355,19 @@ def generate_result_pdf(
         "News Analysis Report"
     )
 
+
     y -= 45
 
-    # --------------------------------------------------------
-    # Result
-    # --------------------------------------------------------
+
+    # ========================================================
+    # RESULT
+    # ========================================================
 
     pdf.setFont(
         "Helvetica-Bold",
         20
     )
+
 
     pdf.drawString(
         50,
@@ -983,11 +1375,13 @@ def generate_result_pdf(
         result["result"]
     )
 
+
     y -= 35
 
-    # --------------------------------------------------------
-    # Details
-    # --------------------------------------------------------
+
+    # ========================================================
+    # DETAILS
+    # ========================================================
 
     details = [
 
@@ -1022,6 +1416,7 @@ def generate_result_pdf(
         )
     ]
 
+
     for label, value in details:
 
         pdf.setFont(
@@ -1029,16 +1424,19 @@ def generate_result_pdf(
             11
         )
 
+
         pdf.drawString(
             50,
             y,
             f"{label}:"
         )
 
+
         pdf.setFont(
             "Helvetica",
             11
         )
+
 
         pdf.drawString(
             150,
@@ -1046,18 +1444,22 @@ def generate_result_pdf(
             str(value)
         )
 
+
         y -= 23
+
 
     y -= 20
 
-    # --------------------------------------------------------
-    # Text
-    # --------------------------------------------------------
+
+    # ========================================================
+    # ANALYZED TEXT
+    # ========================================================
 
     pdf.setFont(
         "Helvetica-Bold",
         14
     )
+
 
     pdf.drawString(
         50,
@@ -1065,19 +1467,31 @@ def generate_result_pdf(
         "Extracted / Analyzed Text"
     )
 
+
     y -= 25
+
 
     pdf.setFont(
         "Helvetica",
         9
     )
 
+
+    analyzed_text = str(
+        result.get(
+            "extracted_text",
+            ""
+        )
+    )
+
+
     lines = simpleSplit(
-        result["extracted_text"],
+        analyzed_text,
         "Helvetica",
         9,
         width - 100
     )
+
 
     for line in lines:
 
@@ -1092,15 +1506,19 @@ def generate_result_pdf(
                 9
             )
 
+
         pdf.drawString(
             50,
             y,
             line
         )
 
+
         y -= 13
 
+
     pdf.save()
+
 
     return filename
 
@@ -1115,18 +1533,26 @@ def generate_result_png(
     source_type: str
 ) -> str:
 
-    result_id = uuid4().hex[:12]
+    result_id = (
+        uuid4().hex[:12]
+    )
+
 
     filename = (
         f"news_analysis_{result_id}.png"
     )
 
+
     output_path = (
-        GENERATED_DIR / filename
+        GENERATED_DIR /
+        filename
     )
 
+
     width = 1200
+
     height = 850
+
 
     image = Image.new(
         "RGB",
@@ -1137,13 +1563,15 @@ def generate_result_png(
         "white"
     )
 
+
     draw = ImageDraw.Draw(
         image
     )
 
-    # --------------------------------------------------------
-    # Fonts
-    # --------------------------------------------------------
+
+    # ========================================================
+    # FONTS
+    # ========================================================
 
     try:
 
@@ -1177,9 +1605,10 @@ def generate_result_png(
 
         font_small = font_title
 
-    # --------------------------------------------------------
-    # Header
-    # --------------------------------------------------------
+
+    # ========================================================
+    # HEADER
+    # ========================================================
 
     draw.text(
         (60, 45),
@@ -1188,6 +1617,7 @@ def generate_result_png(
         font=font_title
     )
 
+
     draw.text(
         (60, 105),
         "News Analysis Report",
@@ -1195,14 +1625,16 @@ def generate_result_png(
         font=font_normal
     )
 
-    # --------------------------------------------------------
-    # Result
-    # --------------------------------------------------------
+
+    # ========================================================
+    # RESULT
+    # ========================================================
 
     result_text = (
         f'{result["result"]}  |  '
         f'{result["confidence"]}%'
     )
+
 
     draw.text(
         (60, 190),
@@ -1211,14 +1643,19 @@ def generate_result_png(
         font=font_heading
     )
 
-    # --------------------------------------------------------
-    # Confidence bar
-    # --------------------------------------------------------
+
+    # ========================================================
+    # CONFIDENCE BAR
+    # ========================================================
 
     bar_x = 60
+
     bar_y = 260
+
     bar_width = 1080
+
     bar_height = 25
+
 
     draw.rectangle(
         (
@@ -1230,11 +1667,30 @@ def generate_result_png(
         fill="#dddddd"
     )
 
+
+    confidence_value = float(
+        result.get(
+            "confidence",
+            0
+        )
+    )
+
+
+    confidence_value = max(
+        0,
+        min(
+            100,
+            confidence_value
+        )
+    )
+
+
     filled_width = int(
         bar_width *
-        result["confidence"] /
+        confidence_value /
         100
     )
+
 
     draw.rectangle(
         (
@@ -1246,9 +1702,10 @@ def generate_result_png(
         fill="#222222"
     )
 
-    # --------------------------------------------------------
-    # Details
-    # --------------------------------------------------------
+
+    # ========================================================
+    # DETAILS
+    # ========================================================
 
     details = [
 
@@ -1263,7 +1720,9 @@ def generate_result_png(
         f'Characters: {result["character_count"]}'
     ]
 
+
     y = 330
+
 
     for detail in details:
 
@@ -1274,11 +1733,13 @@ def generate_result_png(
             font=font_normal
         )
 
+
         y += 42
 
-    # --------------------------------------------------------
-    # Disclaimer
-    # --------------------------------------------------------
+
+    # ========================================================
+    # DISCLAIMER
+    # ========================================================
 
     draw.text(
         (60, 590),
@@ -1287,12 +1748,14 @@ def generate_result_png(
         font=font_small
     )
 
+
     draw.text(
         (60, 620),
         "not guaranteed factual verification.",
         fill="gray",
         font=font_small
     )
+
 
     draw.text(
         (60, 730),
@@ -1301,10 +1764,12 @@ def generate_result_png(
         font=font_small
     )
 
+
     image.save(
         output_path,
         "PNG"
     )
+
 
     return filename
 
@@ -1317,7 +1782,9 @@ def generate_result_png(
 def home():
 
     return render_template(
-        "index.html"
+        "index.html",
+        enable_lstm=ENABLE_LSTM,
+        environment=ENVIRONMENT_NAME
     )
 
 
@@ -1337,16 +1804,20 @@ def predict():
             silent=True
         )
 
+
         if not data:
 
             return jsonify({
+
                 "error":
-                "Invalid JSON request."
+                    "Invalid JSON request."
+
             }), 400
 
-        # ----------------------------------------------------
-        # Text
-        # ----------------------------------------------------
+
+        # ====================================================
+        # TEXT
+        # ====================================================
 
         text = (
             data.get(
@@ -1356,39 +1827,92 @@ def predict():
             .strip()
         )
 
-        # ----------------------------------------------------
-        # Model
-        # ----------------------------------------------------
+
+        # ====================================================
+        # MODEL
+        # ====================================================
 
         selected_model = data.get(
             "model",
             "tfidf"
         )
 
-        # ----------------------------------------------------
-        # Validation
-        # ----------------------------------------------------
+
+        selected_model = (
+            str(selected_model)
+            .strip()
+            .lower()
+        )
+
+
+        # ====================================================
+        # VALID MODEL
+        # ====================================================
+
+        if selected_model not in {
+            "tfidf",
+            "lstm"
+        }:
+
+            return jsonify({
+
+                "error":
+                    "Invalid model selected. "
+                    "Choose TF-IDF or LSTM."
+
+            }), 400
+
+
+        # ====================================================
+        # RENDER LSTM BLOCK
+        # ====================================================
+
+        if (
+            selected_model == "lstm"
+            and
+            not ENABLE_LSTM
+        ):
+
+            return jsonify({
+
+                "error":
+                    "LSTM is not available on the "
+                    "Render deployment. Please select TF-IDF."
+
+            }), 400
+
+
+        # ====================================================
+        # TEXT VALIDATION
+        # ====================================================
 
         if not text:
 
             return jsonify({
+
                 "error":
-                "Please enter a news article."
+                    "Please enter a news article."
+
             }), 400
+
 
         if len(text.split()) < 5:
 
             return jsonify({
+
                 "error":
-                "Please enter a longer news article."
+                    "Please enter a longer news article."
+
             }), 400
 
-        print(
-            "\n======================================"
-        )
+
+        print()
+        print("======================================")
+        print("POST /predict")
 
         print(
-            "POST /predict"
+            "Environment:",
+            ENVIRONMENT_NAME
         )
 
         print(
@@ -1396,97 +1920,121 @@ def predict():
             selected_model
         )
 
-        # ----------------------------------------------------
-        # Prediction
-        # ----------------------------------------------------
+
+        # ====================================================
+        # PREDICTION
+        # ====================================================
 
         result = predict_text(
             text,
             selected_model
         )
 
-        # ----------------------------------------------------
-        # Source
-        # ----------------------------------------------------
+
+        # ====================================================
+        # SOURCE
+        # ====================================================
 
         source_type = "Typed Text"
 
-        source_name = "Text entered by user"
+        source_name = (
+            "Text entered by user"
+        )
 
-        result["source_type"] = source_type
 
-        # ----------------------------------------------------
+        result["source_type"] = (
+            source_type
+        )
+
+
+        # ====================================================
         # PDF
-        # ----------------------------------------------------
+        # ====================================================
 
-        pdf_filename = generate_result_pdf(
-            result,
-            source_name,
-            source_type
+        pdf_filename = (
+            generate_result_pdf(
+                result,
+                source_name,
+                source_type
+            )
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # PNG
-        # ----------------------------------------------------
+        # ====================================================
 
-        png_filename = generate_result_png(
-            result,
-            source_name,
-            source_type
+        png_filename = (
+            generate_result_png(
+                result,
+                source_name,
+                source_type
+            )
         )
 
-        # ----------------------------------------------------
-        # URLs
-        # ----------------------------------------------------
+
+        # ====================================================
+        # DOWNLOAD URLS
+        # ====================================================
 
         result["pdf_url"] = (
             f"/download/{pdf_filename}"
         )
 
+
         result["png_url"] = (
             f"/download/{png_filename}"
         )
+
 
         print(
             "Prediction successful."
         )
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
+
 
         return jsonify(
             result
-        )
+        ), 200
+
 
     except Exception as e:
 
-        print(
-            "\n======================================"
-        )
+        print()
+        print("======================================")
+        print("PREDICTION ERROR")
+        print("======================================")
 
-        print(
-            "PREDICTION ERROR"
-        )
 
         print(
             "Error type:",
             type(e).__name__
         )
 
+
         print(
             "Error:",
             str(e)
         )
 
+
         traceback.print_exc()
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
 
+
         return jsonify({
-            "error": str(e)
+
+            "error":
+                str(e)
+
         }), 500
 
 
@@ -1502,61 +2050,134 @@ def upload():
 
     try:
 
-        uploaded_file = request.files.get(
-            "file"
+        # ====================================================
+        # FILE
+        # ====================================================
+
+        uploaded_file = (
+            request.files.get(
+                "file"
+            )
         )
 
-        selected_model = request.form.get(
-            "model",
-            "tfidf"
+
+        # ====================================================
+        # MODEL
+        # ====================================================
+
+        selected_model = (
+            request.form.get(
+                "model",
+                "tfidf"
+            )
         )
 
-        # ----------------------------------------------------
-        # File check
-        # ----------------------------------------------------
+
+        selected_model = (
+            str(selected_model)
+            .strip()
+            .lower()
+        )
+
+
+        # ====================================================
+        # VALID MODEL
+        # ====================================================
+
+        if selected_model not in {
+            "tfidf",
+            "lstm"
+        }:
+
+            return jsonify({
+
+                "error":
+                    "Invalid model selected. "
+                    "Choose TF-IDF or LSTM."
+
+            }), 400
+
+
+        # ====================================================
+        # RENDER LSTM BLOCK
+        # ====================================================
+
+        if (
+            selected_model == "lstm"
+            and
+            not ENABLE_LSTM
+        ):
+
+            return jsonify({
+
+                "error":
+                    "LSTM is not available on the "
+                    "Render deployment. Please select TF-IDF."
+
+            }), 400
+
+
+        # ====================================================
+        # FILE VALIDATION
+        # ====================================================
 
         if not uploaded_file:
 
             return jsonify({
+
                 "error":
-                "Please select an image or PDF."
+                    "Please select an image or PDF."
+
             }), 400
+
 
         filename = (
             uploaded_file.filename or ""
         )
 
-        # ----------------------------------------------------
-        # Extension
-        # ----------------------------------------------------
+
+        # ====================================================
+        # EXTENSION
+        # ====================================================
 
         if not allowed_file(filename):
 
             return jsonify({
+
                 "error":
-                "Unsupported file type. "
-                "Please upload PNG, JPG, JPEG, WEBP, or PDF."
+                    "Unsupported file type. "
+                    "Please upload PNG, JPG, JPEG, "
+                    "WEBP, or PDF."
+
             }), 400
 
-        # ----------------------------------------------------
-        # Read
-        # ----------------------------------------------------
 
-        file_bytes = uploaded_file.read()
+        # ====================================================
+        # READ FILE
+        # ====================================================
+
+        file_bytes = (
+            uploaded_file.read()
+        )
+
 
         if not file_bytes:
 
             return jsonify({
+
                 "error":
-                "The uploaded file is empty."
+                    "The uploaded file is empty."
+
             }), 400
 
-        print(
-            "\n======================================"
-        )
+
+        print()
+        print("======================================")
+        print("POST /upload")
 
         print(
-            "POST /upload"
+            "Environment:",
+            ENVIRONMENT_NAME
         )
 
         print(
@@ -1569,9 +2190,10 @@ def upload():
             selected_model
         )
 
-        # ----------------------------------------------------
-        # Extract
-        # ----------------------------------------------------
+
+        # ====================================================
+        # EXTRACT TEXT
+        # ====================================================
 
         (
             extracted_text,
@@ -1582,9 +2204,10 @@ def upload():
             file_bytes
         )
 
-        # ----------------------------------------------------
-        # Normalize
-        # ----------------------------------------------------
+
+        # ====================================================
+        # NORMALIZE TEXT
+        # ====================================================
 
         extracted_text = (
             normalize_extracted_text(
@@ -1592,120 +2215,155 @@ def upload():
             )
         )
 
-        # ----------------------------------------------------
-        # Validate
-        # ----------------------------------------------------
+
+        # ====================================================
+        # VALIDATE EXTRACTED TEXT
+        # ====================================================
 
         if not extracted_text:
 
             return jsonify({
+
                 "error":
-                "No readable text could be extracted from the file."
+                    "No readable text could be extracted "
+                    "from the file."
+
             }), 400
+
 
         if len(extracted_text.split()) < 5:
 
             return jsonify({
+
                 "error":
-                "The file does not contain enough readable text."
+                    "The file does not contain enough "
+                    "readable text."
+
             }), 400
 
-        # ----------------------------------------------------
-        # Prediction
-        # ----------------------------------------------------
+
+        # ====================================================
+        # PREDICTION
+        # ====================================================
 
         result = predict_text(
             extracted_text,
             selected_model
         )
 
-        # ----------------------------------------------------
-        # Source
-        # ----------------------------------------------------
 
-        result["source_type"] = source_type
+        # ====================================================
+        # SOURCE INFORMATION
+        # ====================================================
 
-        result["used_ocr"] = used_ocr
+        result["source_type"] = (
+            source_type
+        )
 
-        result["filename"] = filename
 
-        # ----------------------------------------------------
+        result["used_ocr"] = (
+            used_ocr
+        )
+
+
+        result["filename"] = (
+            filename
+        )
+
+
+        # ====================================================
         # PDF
-        # ----------------------------------------------------
+        # ====================================================
 
-        pdf_filename = generate_result_pdf(
-            result,
-            filename,
-            source_type
+        pdf_filename = (
+            generate_result_pdf(
+                result,
+                filename,
+                source_type
+            )
         )
 
-        # ----------------------------------------------------
+
+        # ====================================================
         # PNG
-        # ----------------------------------------------------
+        # ====================================================
 
-        png_filename = generate_result_png(
-            result,
-            filename,
-            source_type
+        png_filename = (
+            generate_result_png(
+                result,
+                filename,
+                source_type
+            )
         )
 
-        # ----------------------------------------------------
-        # URLs
-        # ----------------------------------------------------
+
+        # ====================================================
+        # DOWNLOAD URLS
+        # ====================================================
 
         result["pdf_url"] = (
             f"/download/{pdf_filename}"
         )
 
+
         result["png_url"] = (
             f"/download/{png_filename}"
         )
+
 
         print(
             "Upload prediction successful."
         )
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
+
 
         return jsonify(
             result
-        )
+        ), 200
+
 
     except Exception as e:
 
-        print(
-            "\n======================================"
-        )
+        print()
+        print("======================================")
+        print("UPLOAD ERROR")
+        print("======================================")
 
-        print(
-            "UPLOAD ERROR"
-        )
 
         print(
             "Error type:",
             type(e).__name__
         )
 
+
         print(
             "Error:",
             str(e)
         )
 
+
         traceback.print_exc()
 
+
         print(
-            "======================================\n"
+            "======================================"
         )
 
+
         return jsonify({
-            "error": str(e)
+
+            "error":
+                str(e)
+
         }), 500
 
 
 # ============================================================
-# DOWNLOAD
+# DOWNLOAD GENERATED FILE
 # ============================================================
 
 @app.route(
@@ -1714,8 +2372,11 @@ def upload():
 def download_result(filename):
 
     return send_from_directory(
+
         GENERATED_DIR,
+
         filename,
+
         as_attachment=True
     )
 
@@ -1728,35 +2389,78 @@ def download_result(filename):
 def file_too_large(error):
 
     return jsonify({
+
         "error":
-        "File is too large. Maximum size is 16 MB."
+            "File is too large. "
+            "Maximum size is 16 MB."
+
     }), 413
 
 
 # ============================================================
-# GENERAL ERROR
+# GENERAL SERVER ERROR
 # ============================================================
 
 @app.errorhandler(500)
 def internal_server_error(error):
 
     return jsonify({
+
         "error":
-        "Internal server error. Check the Render logs."
+            "Internal server error. "
+            "Check the server logs."
+
     }), 500
 
+# ============================================================
+# START APPLICATION
+# ============================================================
 
-# ============================================================
-# RUN
-# ============================================================
 if __name__ == "__main__":
 
-    print("\n======================================")
-    print("        AI NEWS INTELLIGENCE")
+    print()
     print("======================================")
-    print("Starting local development server...")
-    print("Open: http://127.0.0.1:5000")
-    print("======================================\n")
+    print("       AI NEWS INTELLIGENCE")
+    print("======================================")
+
+    print(
+        "Starting local development server..."
+    )
+
+    print(
+        "Open: http://127.0.0.1:5000"
+    )
+
+    print(
+        "Environment:",
+        ENVIRONMENT_NAME
+    )
+
+    print(
+        "Render detected:",
+        IS_RENDER
+    )
+
+    print(
+        "LSTM enabled:",
+        ENABLE_LSTM
+    )
+
+    if ENABLE_LSTM:
+
+        print(
+            "Models: TF-IDF + LSTM"
+        )
+
+    else:
+
+        print(
+            "Models: TF-IDF only"
+        )
+
+    print(
+        "======================================"
+    )
 
     app.run(
         host="0.0.0.0",

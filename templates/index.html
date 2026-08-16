@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -15,36 +16,91 @@
         rel="stylesheet"
         href="{{ url_for('static', filename='style.css') }}"
     >
+
 </head>
 
-<body>
+
+<!--
+    Environment information is optional.
+
+    If Flask provides:
+        environment="local"
+        or
+        environment="render"
+
+    JavaScript will use it.
+
+    If Flask does not provide it, JavaScript automatically
+    detects localhost / 127.0.0.1 as local and Render domains
+    as Render.
+-->
+
+<body
+    data-environment="{{ environment|default('') }}"
+>
+
 
 <div class="page">
 
-    <!-- NAVBAR -->
+
+    <!-- =========================================================
+         NAVBAR
+    ========================================================== -->
 
     <nav class="navbar">
 
         <div class="brand">
-            <span class="brand-mark">AN</span>
+
+            <span class="brand-mark">
+                AN
+            </span>
 
             <div>
-                <strong>AI News Intelligence</strong>
-                <small>NLP-Based News Analysis System</small>
+
+                <strong>
+                    AI News Intelligence
+                </strong>
+
+                <small>
+                    NLP-Based News Analysis System
+                </small>
+
             </div>
+
         </div>
 
+
         <div class="nav-links">
-            <a href="#analyzer">Analyzer</a>
-            <a href="#how-it-works">How It Works</a>
-            <a href="#models">Models</a>
-            <a href="#about">About</a>
+
+            <a href="#analyzer">
+                Analyzer
+            </a>
+
+            <a href="#how-it-works">
+                How It Works
+            </a>
+
+            <a href="#models">
+                Models
+            </a>
+
+            <a href="#about">
+                About
+            </a>
+
         </div>
+
+
+        <!-- =====================================================
+             THEME
+        ====================================================== -->
+
         <div class="theme-toggle">
 
             <button
                 id="lightMode"
                 class="theme-button active"
+                type="button"
                 onclick="setTheme('light')"
             >
                 ☀ Light
@@ -53,6 +109,7 @@
             <button
                 id="darkMode"
                 class="theme-button"
+                type="button"
                 onclick="setTheme('dark')"
             >
                 ☾ Dark
@@ -63,7 +120,10 @@
     </nav>
 
 
-    <!-- HERO -->
+
+    <!-- =========================================================
+         HERO
+    ========================================================== -->
 
     <header class="hero">
 
@@ -71,12 +131,22 @@
             NLP • MACHINE LEARNING • DEEP LEARNING • BIG DATA
         </div>
 
+
         <h1>
             Analyze News.<br>
             Understand the Prediction.
         </h1>
 
-        
+
+        <p class="hero-description">
+
+            Analyze news articles using traditional NLP and
+            deep learning models. Enter text or upload an
+            image/PDF to generate a prediction.
+
+        </p>
+
+
         <a
             href="#analyzer"
             class="hero-button"
@@ -87,9 +157,17 @@
     </header>
 
 
-    <!-- ANALYZER -->
+
+    <!-- =========================================================
+         MAIN
+    ========================================================== -->
 
     <main>
+
+
+        <!-- =====================================================
+             ANALYZER
+        ====================================================== -->
 
         <section
             id="analyzer"
@@ -98,14 +176,16 @@
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>News Analyzer</h2>
+
+                    <h2>
+                        News Analyzer
+                    </h2>
 
                     <p>
                         Enter news text or upload an image/PDF.
                     </p>
+
                 </div>
 
             </div>
@@ -113,11 +193,15 @@
 
             <div class="analyzer-card">
 
-                <!-- INPUT SWITCH -->
+
+                <!-- =================================================
+                     INPUT SWITCH
+                ================================================== -->
 
                 <div class="input-switch">
 
                     <button
+                        type="button"
                         class="switch-button active"
                         data-tab="text"
                         onclick="switchTab('text')"
@@ -125,7 +209,9 @@
                         Text Input
                     </button>
 
+
                     <button
+                        type="button"
                         class="switch-button"
                         data-tab="file"
                         onclick="switchTab('file')"
@@ -136,30 +222,44 @@
                 </div>
 
 
-                <!-- TEXT -->
+
+                <!-- =================================================
+                     TEXT INPUT
+                ================================================== -->
 
                 <div
                     id="textPanel"
                     class="panel active"
                 >
 
-                    <label class="field-label">
+                    <label
+                        class="field-label"
+                        for="newsText"
+                    >
                         News Article
                     </label>
+
 
                     <textarea
                         id="newsText"
                         placeholder="Paste the news article here..."
                     ></textarea>
 
+
                     <div class="input-hint">
-                        Enter the article text, including its headline if available.
+
+                        Enter the article text, including its
+                        headline if available.
+
                     </div>
 
                 </div>
 
 
-                <!-- FILE -->
+
+                <!-- =================================================
+                     FILE INPUT
+                ================================================== -->
 
                 <div
                     id="filePanel"
@@ -170,6 +270,7 @@
                         Upload News
                     </label>
 
+
                     <div
                         id="dropZone"
                         class="drop-zone"
@@ -179,13 +280,16 @@
                             +
                         </div>
 
+
                         <h3>
                             Drop an image or PDF here
                         </h3>
 
+
                         <p>
                             or select a file from your computer
                         </p>
+
 
                         <label class="browse-button">
 
@@ -200,12 +304,17 @@
 
                         </label>
 
+
                         <small>
-                            PNG, JPG, JPEG, WEBP and PDF · Maximum 16 MB
+                            PNG, JPG, JPEG, WEBP and PDF ·
+                            Maximum 16 MB
                         </small>
 
                     </div>
 
+
+
+                    <!-- SELECTED FILE -->
 
                     <div
                         id="selectedFile"
@@ -213,16 +322,29 @@
                     >
 
                         <div>
-                            <span class="file-icon">PDF</span>
+
+                            <span
+                                id="fileIcon"
+                                class="file-icon"
+                            >
+                                FILE
+                            </span>
+
 
                             <div>
-                                <strong id="selectedFileName"></strong>
+
+                                <strong
+                                    id="selectedFileName"
+                                ></strong>
 
                                 <small>
                                     Ready for analysis
                                 </small>
+
                             </div>
+
                         </div>
+
 
                         <button
                             type="button"
@@ -234,14 +356,21 @@
                     </div>
 
 
+
+                    <!-- EXTRACTED TEXT -->
+
                     <div
                         id="extractedPreview"
                         class="extracted-preview hidden"
                     >
 
-                        <label class="field-label">
+                        <label
+                            class="field-label"
+                            for="extractedText"
+                        >
                             Extracted Text
                         </label>
+
 
                         <textarea
                             id="extractedText"
@@ -253,7 +382,10 @@
                 </div>
 
 
-                <!-- MODEL -->
+
+                <!-- =================================================
+                     MODEL SELECTION
+                ================================================== -->
 
                 <div class="model-area">
 
@@ -261,7 +393,13 @@
                         Prediction Model
                     </label>
 
+
                     <div class="model-selection">
+
+
+                        <!-- =================================================
+                             TF-IDF
+                        ================================================== -->
 
                         <label class="model-choice">
 
@@ -272,28 +410,57 @@
                                 checked
                             >
 
+
                             <div>
 
                                 <strong>
                                     TF-IDF + Logistic Regression
                                 </strong>
 
+
                                 <span>
                                     Traditional NLP model · 99.10%
                                 </span>
+
+
+                                <small>
+                                    Fast and lightweight.
+                                    Recommended for normal text analysis.
+                                </small>
 
                             </div>
 
                         </label>
 
 
-                        <label class="model-choice">
+
+                        <!-- =================================================
+                             LSTM
+
+                             IMPORTANT:
+                             This is ALWAYS rendered.
+
+                             JavaScript decides whether it is visible.
+
+                             Local:
+                                 visible
+
+                             Render:
+                                 hidden
+                        ================================================== -->
+
+                        <label
+                            id="lstmModelChoice"
+                            class="model-choice"
+                        >
 
                             <input
                                 type="radio"
                                 name="model"
                                 value="lstm"
+                                id="lstmModel"
                             >
+
 
                             <div>
 
@@ -301,43 +468,69 @@
                                     LSTM Neural Network
                                 </strong>
 
+
                                 <span>
                                     Deep learning model · 93.34%
                                 </span>
+
+
+                                <small>
+                                    Uses the local TFLite/LiteRT model
+                                    and tokenizer. Loaded only when selected.
+                                </small>
 
                             </div>
 
                         </label>
 
+
                     </div>
+
 
                 </div>
 
 
-                <!-- ACTION -->
+
+                <!-- =================================================
+                     ACTION BUTTONS
+                ================================================== -->
 
                 <div class="action-area">
 
                     <button
                         id="analyzeButton"
                         class="analyze-button"
+                        type="button"
                         onclick="analyze()"
                     >
+
                         Analyze News
-                        <span>→</span>
+
+                        <span>
+                            →
+                        </span>
+
                     </button>
 
+
                     <button
+                        id="clearButton"
                         class="clear-button"
+                        type="button"
                         onclick="clearAll()"
                     >
+
                         Clear
+
                     </button>
 
                 </div>
 
 
-                <!-- LOADING -->
+
+                <!-- =================================================
+                     LOADING
+                ================================================== -->
 
                 <div
                     id="loading"
@@ -346,18 +539,23 @@
 
                     <div class="loader"></div>
 
-                    <span>
+
+                    <span id="loadingText">
                         Processing your content...
                     </span>
 
                 </div>
 
 
-                <!-- ERROR -->
+
+                <!-- =================================================
+                     ERROR
+                ================================================== -->
 
                 <div
                     id="error"
                     class="error hidden"
+                    role="alert"
                 ></div>
 
             </div>
@@ -365,7 +563,10 @@
         </section>
 
 
-        <!-- RESULT -->
+
+        <!-- =========================================================
+             RESULT
+        ========================================================== -->
 
         <section
             id="resultCard"
@@ -374,14 +575,16 @@
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>Analysis Result</h2>
+
+                    <h2>
+                        Analysis Result
+                    </h2>
 
                     <p>
                         Prediction generated from the selected model.
                     </p>
+
                 </div>
 
             </div>
@@ -389,11 +592,17 @@
 
             <div class="result-card">
 
+
+                <!-- RESULT ICON -->
+
                 <div
                     id="resultIcon"
                     class="result-icon"
-                >
-                </div>
+                ></div>
+
+
+
+                <!-- RESULT MAIN -->
 
                 <div class="result-main">
 
@@ -401,12 +610,17 @@
                         PREDICTION
                     </span>
 
+
                     <h2 id="resultTitle"></h2>
+
 
                     <p id="sourceInfo"></p>
 
                 </div>
 
+
+
+                <!-- CONFIDENCE -->
 
                 <div class="confidence-box">
 
@@ -416,17 +630,20 @@
                             Model confidence
                         </span>
 
+
                         <strong id="confidence">
                             0%
                         </strong>
 
                     </div>
 
+
                     <div class="confidence-track">
 
                         <div
                             id="confidenceBar"
                             class="confidence-fill"
+                            style="width: 0%;"
                         ></div>
 
                     </div>
@@ -434,24 +651,46 @@
                 </div>
 
 
+
+                <!-- STATISTICS -->
+
                 <div class="statistics">
 
+
                     <div>
-                        <span>MODEL</span>
+
+                        <span>
+                            MODEL
+                        </span>
+
                         <strong id="resultModel"></strong>
+
                     </div>
 
+
                     <div>
-                        <span>WORDS</span>
+
+                        <span>
+                            WORDS
+                        </span>
+
                         <strong id="resultWords"></strong>
+
                     </div>
 
+
                     <div>
-                        <span>CHARACTERS</span>
+
+                        <span>
+                            CHARACTERS
+                        </span>
+
                         <strong id="resultCharacters"></strong>
+
                     </div>
 
                 </div>
+
 
 
                 <!-- DOWNLOAD -->
@@ -462,12 +701,19 @@
                 >
 
                     <div>
-                        <strong>Save the result</strong>
+
+                        <strong>
+                            Save the result
+                        </strong>
+
 
                         <p>
-                            Generate a report for your project or presentation.
+                            Generate a report for your project
+                            or presentation.
                         </p>
+
                     </div>
+
 
                     <div class="download-actions">
 
@@ -475,14 +721,19 @@
                             id="downloadPdf"
                             href="#"
                             class="download-button"
+                            target="_blank"
+                            rel="noopener"
                         >
                             Download PDF
                         </a>
+
 
                         <a
                             id="downloadPng"
                             href="#"
                             class="download-button secondary"
+                            target="_blank"
+                            rel="noopener"
                         >
                             Download Image
                         </a>
@@ -496,7 +747,10 @@
         </section>
 
 
-        <!-- HOW IT WORKS -->
+
+        <!-- =========================================================
+             HOW IT WORKS
+        ========================================================== -->
 
         <section
             id="how-it-works"
@@ -505,14 +759,17 @@
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>How It Works</h2>
+
+                    <h2>
+                        How It Works
+                    </h2>
 
                     <p>
-                        The system processes the input through several stages.
+                        The system processes the input through
+                        several stages.
                     </p>
+
                 </div>
 
             </div>
@@ -520,11 +777,12 @@
 
             <div class="pipeline">
 
+
                 <div class="pipeline-step">
 
-                    
-
-                    <h3>Input</h3>
+                    <h3>
+                        Input
+                    </h3>
 
                     <p>
                         Text, image or PDF is provided for analysis.
@@ -538,9 +796,9 @@
 
                 <div class="pipeline-step">
 
-                    
-
-                    <h3>Extraction</h3>
+                    <h3>
+                        Extraction
+                    </h3>
 
                     <p>
                         OCR or PDF extraction obtains the article text.
@@ -554,12 +812,13 @@
 
                 <div class="pipeline-step">
 
-                    
-
-                    <h3>NLP</h3>
+                    <h3>
+                        NLP
+                    </h3>
 
                     <p>
-                        Text is cleaned, tokenized and transformed.
+                        Text is cleaned, normalized and transformed
+                        for the selected model.
                     </p>
 
                 </div>
@@ -570,12 +829,13 @@
 
                 <div class="pipeline-step">
 
-                    
-
-                    <h3>Prediction</h3>
+                    <h3>
+                        Prediction
+                    </h3>
 
                     <p>
-                        The selected model predicts the news class.
+                        The selected model predicts whether the
+                        article is Real or Fake.
                     </p>
 
                 </div>
@@ -585,7 +845,10 @@
         </section>
 
 
-        <!-- MODELS -->
+
+        <!-- =========================================================
+             MODELS
+        ========================================================== -->
 
         <section
             id="models"
@@ -594,14 +857,17 @@
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>Model Comparison</h2>
+
+                    <h2>
+                        Model Comparison
+                    </h2>
 
                     <p>
-                        Two different approaches were implemented and evaluated.
+                        Two different approaches were implemented
+                        and evaluated.
                     </p>
+
                 </div>
 
             </div>
@@ -609,41 +875,98 @@
 
             <div class="model-grid">
 
-                <article class="model-card">
 
+                <!-- TF-IDF -->
+
+                <article class="model-card">
 
                     <h3>
                         TF-IDF + Logistic Regression
                     </h3>
+
 
                     <p>
                         A traditional NLP approach using TF-IDF
                         features and Logistic Regression classification.
                     </p>
 
+
                     <div class="accuracy">
-                        <strong>99.10%</strong>
-                        <span>Test Accuracy</span>
+
+                        <strong>
+                            99.10%
+                        </strong>
+
+                        <span>
+                            Test Accuracy
+                        </span>
+
+                    </div>
+
+
+                    <div class="model-tech">
+
+                        <span>
+                            TF-IDF
+                        </span>
+
+                        <span>
+                            Scikit-learn
+                        </span>
+
+                        <span>
+                            Logistic Regression
+                        </span>
+
                     </div>
 
                 </article>
 
 
-                <article class="model-card">
 
+                <!-- LSTM -->
+
+                <article class="model-card">
 
                     <h3>
                         LSTM Neural Network
                     </h3>
 
+
                     <p>
                         A deep learning approach using tokenized text,
-                        embeddings and an LSTM sequence model.
+                        embeddings and an LSTM sequence model converted
+                        to TFLite/LiteRT.
                     </p>
 
+
                     <div class="accuracy">
-                        <strong>93.34%</strong>
-                        <span>Test Accuracy</span>
+
+                        <strong>
+                            93.34%
+                        </strong>
+
+                        <span>
+                            Test Accuracy
+                        </span>
+
+                    </div>
+
+
+                    <div class="model-tech">
+
+                        <span>
+                            LSTM
+                        </span>
+
+                        <span>
+                            TFLite
+                        </span>
+
+                        <span>
+                            LiteRT
+                        </span>
+
                     </div>
 
                 </article>
@@ -653,20 +976,26 @@
         </section>
 
 
-        <!-- BIG DATA -->
+
+        <!-- =========================================================
+             BIG DATA
+        ========================================================== -->
 
         <section class="section">
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>Big Data Component</h2>
+
+                    <h2>
+                        Big Data Component
+                    </h2>
 
                     <p>
-                        PySpark was used to process and analyze the news dataset.
+                        PySpark was used to process and analyze
+                        the news dataset.
                     </p>
+
                 </div>
 
             </div>
@@ -674,24 +1003,56 @@
 
             <div class="bigdata-card">
 
-                <div class="bigdata-stat">
-                    <strong>39,105</strong>
-                    <span>Articles Processed</span>
-                </div>
 
                 <div class="bigdata-stat">
-                    <strong>17,908</strong>
-                    <span>Fake Articles</span>
+
+                    <strong>
+                        39,105
+                    </strong>
+
+                    <span>
+                        Articles Processed
+                    </span>
+
                 </div>
 
-                <div class="bigdata-stat">
-                    <strong>21,197</strong>
-                    <span>Real Articles</span>
-                </div>
 
                 <div class="bigdata-stat">
-                    <strong>7</strong>
-                    <span>Subject Categories</span>
+
+                    <strong>
+                        17,908
+                    </strong>
+
+                    <span>
+                        Fake Articles
+                    </span>
+
+                </div>
+
+
+                <div class="bigdata-stat">
+
+                    <strong>
+                        21,197
+                    </strong>
+
+                    <span>
+                        Real Articles
+                    </span>
+
+                </div>
+
+
+                <div class="bigdata-stat">
+
+                    <strong>
+                        7
+                    </strong>
+
+                    <span>
+                        Subject Categories
+                    </span>
+
                 </div>
 
             </div>
@@ -699,7 +1060,10 @@
         </section>
 
 
-        <!-- ABOUT -->
+
+        <!-- =========================================================
+             ABOUT
+        ========================================================== -->
 
         <section
             id="about"
@@ -708,14 +1072,16 @@
 
             <div class="section-title">
 
-                
-
                 <div>
-                    <h2>About the Project</h2>
+
+                    <h2>
+                        About the Project
+                    </h2>
 
                     <p>
                         Built as an academic NLP and machine learning project.
                     </p>
+
                 </div>
 
             </div>
@@ -723,11 +1089,13 @@
 
             <div class="about-card">
 
+
                 <div>
 
                     <h3>
                         Project Objective
                     </h3>
+
 
                     <p>
                         The purpose of this project is to explore how
@@ -736,7 +1104,15 @@
                         combined to analyze news content.
                     </p>
 
+
+                    <p>
+                        The application supports direct text analysis
+                        as well as text extraction from images and PDF
+                        documents.
+                    </p>
+
                 </div>
+
 
 
                 <div>
@@ -745,17 +1121,23 @@
                         Technologies Used
                     </h3>
 
+
                     <div class="technology-list">
 
                         <span>Python</span>
                         <span>NLTK</span>
                         <span>Scikit-learn</span>
+                        <span>NumPy</span>
                         <span>TensorFlow</span>
-                        <span>Keras</span>
+                        <span>TFLite</span>
+                        <span>LiteRT</span>
+                        <span>LSTM</span>
                         <span>PySpark</span>
                         <span>Flask</span>
+                        <span>Gunicorn</span>
                         <span>Tesseract OCR</span>
                         <span>PyMuPDF</span>
+                        <span>ReportLab</span>
 
                     </div>
 
@@ -766,20 +1148,95 @@
         </section>
 
 
-        <!-- DISCLAIMER -->
+
+        <!-- =========================================================
+             DEPLOYMENT NOTE
+        ========================================================== -->
+
+        <section class="section deployment-section">
+
+            <div class="deployment-card">
+
+                <h2>
+                    Deployment
+                </h2>
+
+
+                <p>
+                    The application supports different model
+                    configurations depending on the environment.
+                </p>
+
+
+                <div class="deployment-points">
+
+
+                    <div>
+
+                        <strong>
+                            Local Development
+                        </strong>
+
+                        <span>
+                            Flask development server with both
+                            TF-IDF + Logistic Regression and
+                            LSTM TFLite/LiteRT prediction available.
+                        </span>
+
+                    </div>
+
+
+
+                    <div>
+
+                        <strong>
+                            Render Cloud Deployment
+                        </strong>
+
+                        <span>
+                            Gunicorn production server with
+                            TF-IDF + Logistic Regression prediction.
+                            LSTM is disabled on the cloud server
+                            to reduce memory usage.
+                        </span>
+
+                    </div>
+
+
+
+                    
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =========================================================
+             DISCLAIMER
+        ========================================================== -->
 
         <section class="disclaimer">
 
-            <strong>Note:</strong>
+            <strong>
+                Note:
+            </strong>
 
-            The result is a machine-learning prediction based on patterns
-            learned from the training dataset. It should not be treated as
-            guaranteed factual verification.
+            The result is a machine-learning prediction based on
+            patterns learned from the training dataset. It should
+            not be treated as guaranteed factual verification.
 
         </section>
 
     </main>
 
+
+
+    <!-- =========================================================
+         FOOTER
+    ========================================================== -->
 
     <footer>
 
@@ -787,8 +1244,9 @@
             AI News Intelligence
         </strong>
 
+
         <span>
-            Designed & Developed by Komal Pandey
+            Designed &amp; Developed by Komal Pandey
         </span>
 
     </footer>
@@ -796,9 +1254,15 @@
 </div>
 
 
+
+<!-- =============================================================
+     JAVASCRIPT
+============================================================== -->
+
 <script
     src="{{ url_for('static', filename='script.js') }}"
 ></script>
+
 
 </body>
 
