@@ -192,33 +192,30 @@ lstm_override = (
 )
 
 
-if IS_RENDER:
+# ============================================================
+# LSTM AVAILABILITY
+# ============================================================
+#
+# TESTING CONFIGURATION:
+#
+# Local  -> TF-IDF + LSTM
+# Render -> TF-IDF + LSTM
+#
+# AI_NEWS_ENABLE_LSTM can explicitly disable LSTM.
+# ============================================================
 
-    # --------------------------------------------------------
-    # Render = TF-IDF only
-    # --------------------------------------------------------
+if lstm_override in {
+    "0",
+    "false",
+    "no",
+    "off"
+}:
 
     ENABLE_LSTM = False
 
 else:
 
-    # --------------------------------------------------------
-    # Local = TF-IDF + LSTM by default
-    # --------------------------------------------------------
-
-    if lstm_override in {
-        "0",
-        "false",
-        "no",
-        "off"
-    }:
-
-        ENABLE_LSTM = False
-
-    else:
-
-        ENABLE_LSTM = True
-
+    ENABLE_LSTM = True
 
 # ============================================================
 # APPLICATION STARTUP INFORMATION
