@@ -3,17 +3,18 @@
 // FRONTEND SCRIPT
 // ============================================================
 //
+// MODEL AVAILABILITY
+//
 // LOCAL:
 //   - TF-IDF + Logistic Regression
 //   - LSTM TFLite / LiteRT
 //
 // RENDER:
-//   - TF-IDF + Logistic Regression ONLY
-//   - LSTM automatically hidden
+//   - Controlled by Flask's enable_lstm setting.
 //
 // IMPORTANT:
-// The frontend controls which model can be selected.
-// The backend MUST ALSO reject LSTM requests on Render.
+// The backend MUST ALSO validate model availability.
+// Frontend restrictions are only for user interface control.
 //
 // ============================================================
 
@@ -43,8 +44,7 @@ function getElement(id) {
 
 function getServerEnvironment() {
 
-    const body =
-        document.body;
+    const body = document.body;
 
     if (!body) {
         return "";
@@ -65,7 +65,7 @@ function isRenderEnvironment() {
 
 
     // --------------------------------------------------------
-    // Explicit server environment
+    // Explicit Flask environment
     // --------------------------------------------------------
 
     if (
@@ -120,12 +120,7 @@ function isRenderEnvironment() {
 
 
     // --------------------------------------------------------
-    // Private/local network IP
-    //
-    // Example:
-    // 192.168.x.x
-    // 10.x.x.x
-    // 172.16.x.x - 172.31.x.x
+    // Private/local network
     // --------------------------------------------------------
 
     if (
@@ -153,11 +148,8 @@ function isRenderEnvironment() {
     // --------------------------------------------------------
     // Unknown domain
     //
-    // If the backend explicitly says render/production,
-    // it was already handled above.
-    //
-    // Otherwise assume local/development so that LSTM
-    // remains available during local testing.
+    // If Flask did not explicitly tell us otherwise,
+    // assume local/development.
     // --------------------------------------------------------
 
     return false;
@@ -173,6 +165,79 @@ function getEnvironmentName() {
     return isRenderEnvironment()
         ? "render"
         : "local";
+}
+
+
+// ============================================================
+// SERVER LSTM FLAG
+// ============================================================
+//
+// This is the IMPORTANT addition.
+//
+// Flask sends:
+//
+// data-lstm-enabled="true"
+// or
+// data-lstm-enabled="false"
+//
+// This flag is now used by the frontend.
+//
+// ============================================================
+
+function isServerLstmEnabled() {
+
+    const body =
+        document.body;
+
+    if (!body) {
+        return false;
+    }
+
+
+    const value =
+        String(
+            body.dataset.lstmEnabled || ""
+        )
+            .trim()
+            .toLowerCase();
+
+
+    if (
+        value === "true" ||
+        value === "1" ||
+        value === "yes" ||
+        value === "on"
+    ) {
+        return true;
+    }
+
+
+    if (
+        value === "false" ||
+        value === "0" ||
+        value === "no" ||
+        value === "off"
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // If the backend did not provide the flag,
+    // fall back to the old environment behaviour.
+    // --------------------------------------------------------
+
+    return !isRenderEnvironment();
+}
+
+
+// ============================================================
+// LSTM AVAILABILITY
+// ============================================================
+
+function isLstmAvailable() {
+
+    return isServerLstmEnabled();
 }
 
 
@@ -229,7 +294,7 @@ function isModelAvailable(model) {
     if (
         normalizedModel === "lstm"
     ) {
-        return !isRenderEnvironment();
+        return isLstmAvailable();
     }
 
 
@@ -242,17 +307,6 @@ function isModelAvailable(model) {
 // ============================================================
 
 function getSelectedModel() {
-
-    // --------------------------------------------------------
-    // Render ALWAYS uses TF-IDF
-    // --------------------------------------------------------
-
-    if (
-        isRenderEnvironment()
-    ) {
-        return "tfidf";
-    }
-
 
     const selected =
         document.querySelector(
@@ -288,8 +342,11 @@ function getSelectedModel() {
 
 function applyEnvironmentModelSettings() {
 
-    const isRender =
+    const render =
         isRenderEnvironment();
+
+    const lstmEnabled =
+        isLstmAvailable();
 
 
     console.log(
@@ -300,7 +357,13 @@ function applyEnvironmentModelSettings() {
 
     console.log(
         "Render:",
-        isRender
+        render
+    );
+
+
+    console.log(
+        "Server LSTM enabled:",
+        lstmEnabled
     );
 
 
@@ -330,76 +393,105 @@ function applyEnvironmentModelSettings() {
 
 
         // ----------------------------------------------------
-        // Render + LSTM
+        // LSTM
         // ----------------------------------------------------
 
         if (
-            isRender &&
             model === "lstm"
         ) {
 
-            choice.classList.add(
-                "hidden"
-            );
+            if (lstmEnabled) {
 
+                // LSTM is enabled by backend.
+                // SHOW IT.
 
-            radio.checked =
-                false;
+                choice.classList.remove(
+                    "hidden"
+                );
 
+                radio.disabled =
+                    false;
 
-            radio.disabled =
-                true;
+            } else {
 
+                // LSTM disabled by backend.
+                // HIDE IT.
+
+                choice.classList.add(
+                    "hidden"
+                );
+
+                radio.checked =
+                    false;
+
+                radio.disabled =
+                    true;
+            }
 
             return;
         }
 
 
         // ----------------------------------------------------
-        // Local + LSTM
+        // TF-IDF
         // ----------------------------------------------------
 
-        choice.classList.remove(
-            "hidden"
-        );
+        if (
+            model === "tfidf"
+        ) {
 
+            choice.classList.remove(
+                "hidden"
+            );
 
-        radio.disabled =
-            false;
+            radio.disabled =
+                false;
+        }
 
     });
 
 
     // --------------------------------------------------------
-    // Render MUST select TF-IDF
+    // If LSTM is disabled, make sure TF-IDF is selected.
     // --------------------------------------------------------
 
-    if (isRender) {
+    if (!lstmEnabled) {
 
-        const tfidfRadio =
+        const selected =
             document.querySelector(
-                'input[name="model"][value="tfidf"]'
+                'input[name="model"]:checked'
             );
 
 
-        if (tfidfRadio) {
+        if (
+            !selected ||
+            normalizeModel(selected.value) === "lstm"
+        ) {
 
-            tfidfRadio.checked =
-                true;
+            const tfidfRadio =
+                document.querySelector(
+                    'input[name="model"][value="tfidf"]'
+                );
 
 
-            tfidfRadio.disabled =
-                false;
+            if (tfidfRadio) {
+
+                tfidfRadio.checked =
+                    true;
+
+                tfidfRadio.disabled =
+                    false;
+            }
         }
     }
 
 
     // --------------------------------------------------------
-    // Local:
-    // make sure TF-IDF is selected if nothing is selected
+    // If LSTM is enabled and nothing is selected,
+    // keep TF-IDF as the default.
     // --------------------------------------------------------
 
-    if (!isRender) {
+    if (lstmEnabled) {
 
         const selected =
             document.querySelector(
@@ -440,7 +532,37 @@ function updateModelInformation() {
         );
 
 
+    // model-note is optional
     if (!modelNote) {
+        return;
+    }
+
+
+    if (
+        isLstmAvailable()
+    ) {
+
+        if (
+            isRenderEnvironment()
+        ) {
+
+            modelNote.innerHTML = `
+                <strong>Cloud deployment:</strong>
+                TF-IDF + Logistic Regression and
+                lightweight LSTM TFLite/LiteRT are currently enabled
+                for testing on Render.
+            `;
+
+        } else {
+
+            modelNote.innerHTML = `
+                <strong>Local development:</strong>
+                Both TF-IDF + Logistic Regression and
+                LSTM TFLite/LiteRT are available locally.
+                LSTM is loaded only when selected.
+            `;
+        }
+
         return;
     }
 
@@ -462,9 +584,7 @@ function updateModelInformation() {
 
     modelNote.innerHTML = `
         <strong>Local development:</strong>
-        Both TF-IDF + Logistic Regression and
-        LSTM TFLite/LiteRT are available locally.
-        LSTM is loaded only when selected.
+        TF-IDF + Logistic Regression is available.
     `;
 }
 
@@ -611,7 +731,6 @@ function initializeFileHandling() {
 
                 event.preventDefault();
 
-
                 dropZone.classList.remove(
                     "dragging"
                 );
@@ -721,8 +840,8 @@ function setSelectedFile(file) {
 
 
     const fileIcon =
-        document.querySelector(
-            ".file-icon"
+        getElement(
+            "fileIcon"
         );
 
 
@@ -867,8 +986,7 @@ function formatFileSize(bytes) {
 
 
     if (
-        size <
-        1024 * 1024
+        size < 1024 * 1024
     ) {
 
         return `${(
@@ -903,16 +1021,16 @@ async function analyze() {
 
 
     // --------------------------------------------------------
-    // HARD Render protection
+    // HARD FRONTEND PROTECTION
     // --------------------------------------------------------
 
     if (
-        isRenderEnvironment() &&
-        model === "lstm"
+        model === "lstm" &&
+        !isLstmAvailable()
     ) {
 
         console.warn(
-            "LSTM blocked on Render. Falling back to TF-IDF."
+            "LSTM is disabled by server configuration. Falling back to TF-IDF."
         );
 
 
@@ -936,6 +1054,12 @@ async function analyze() {
     console.log(
         "Environment:",
         getEnvironmentName()
+    );
+
+
+    console.log(
+        "LSTM enabled:",
+        isLstmAvailable()
     );
 
 
@@ -1010,8 +1134,8 @@ async function analyzeText(model) {
 
 
     if (
-        isRenderEnvironment() &&
-        model !== "tfidf"
+        model === "lstm" &&
+        !isLstmAvailable()
     ) {
 
         model =
@@ -1133,8 +1257,8 @@ async function analyzeFile(model) {
 
 
     if (
-        isRenderEnvironment() &&
-        model !== "tfidf"
+        model === "lstm" &&
+        !isLstmAvailable()
     ) {
 
         model =
@@ -1736,11 +1860,7 @@ function displayResult(
 
         resultModel.textContent =
             data.model ||
-            (
-                isRenderEnvironment()
-                    ? "TF-IDF"
-                    : "Unknown"
-            );
+            "Unknown";
     }
 
 
@@ -1972,11 +2092,13 @@ function showLoading(show) {
                 );
 
 
-            // Render LSTM stays disabled
+            // ------------------------------------------------
+            // LSTM disabled by server
+            // ------------------------------------------------
 
             if (
-                isRenderEnvironment() &&
-                model === "lstm"
+                model === "lstm" &&
+                !isLstmAvailable()
             ) {
 
                 radio.disabled =
@@ -2062,7 +2184,6 @@ function clearError() {
 
         error.textContent =
             "";
-
 
         error.classList.add(
             "hidden"
@@ -2324,11 +2445,19 @@ function initializeModelHandling() {
                     clearError();
 
 
-                    if (
-                        isRenderEnvironment() &&
+                    const selectedModel =
                         normalizeModel(
                             radio.value
-                        ) === "lstm"
+                        );
+
+
+                    // ------------------------------------------------
+                    // LSTM is disabled
+                    // ------------------------------------------------
+
+                    if (
+                        selectedModel === "lstm" &&
+                        !isLstmAvailable()
                     ) {
 
                         const tfidfRadio =
@@ -2345,7 +2474,7 @@ function initializeModelHandling() {
 
 
                         showError(
-                            "LSTM is available only in the local version. TF-IDF has been selected."
+                            "LSTM is currently disabled by the server. TF-IDF has been selected."
                         );
 
 
@@ -2356,6 +2485,12 @@ function initializeModelHandling() {
                     console.log(
                         "Environment:",
                         getEnvironmentName()
+                    );
+
+
+                    console.log(
+                        "Server LSTM enabled:",
+                        isLstmAvailable()
                     );
 
 
@@ -2432,7 +2567,17 @@ document.addEventListener(
     () => {
 
         console.log(
+            "=========================================="
+        );
+
+
+        console.log(
             "AI News Intelligence frontend loaded."
+        );
+
+
+        console.log(
+            "=========================================="
         );
 
 
@@ -2455,8 +2600,14 @@ document.addEventListener(
 
 
         console.log(
+            "HTML data-lstm-enabled:",
+            document.body?.dataset?.lstmEnabled
+        );
+
+
+        console.log(
             "LSTM available:",
-            isModelAvailable("lstm")
+            isLstmAvailable()
         );
 
 
@@ -2514,6 +2665,11 @@ document.addEventListener(
 
         switchTab(
             "text"
+        );
+
+
+        console.log(
+            "=========================================="
         );
 
     }
