@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Render will run TF-IDF only.
 # LSTM remains available in your local environment.
-ENV AI_NEWS_ENABLE_LSTM=0
+ENV AI_NEWS_ENABLE_LSTM=1
 
 WORKDIR /app
 
