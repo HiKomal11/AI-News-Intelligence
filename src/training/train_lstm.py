@@ -37,16 +37,16 @@ MODEL_DIR.mkdir(exist_ok=True)
 # SETTINGS
 # ============================================================
 
-MAX_WORDS = 10000
-MAX_SEQUENCE_LENGTH = 200
+MAX_WORDS = 20000
+MAX_SEQUENCE_LENGTH = 300
 
-EMBEDDING_DIM = 64
-LSTM_UNITS = 32
+EMBEDDING_DIM = 128
+LSTM_UNITS = 64
 
 TEST_SIZE = 0.20
 RANDOM_STATE = 42
 
-EPOCHS = 8
+EPOCHS = 10
 BATCH_SIZE = 64
 
 
